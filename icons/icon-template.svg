@@ -1,0 +1,20 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="64" cy="64" r="60" fill="#2196F3" stroke="#1976D2" stroke-width="2"/>
+  
+  <!-- 云朵 -->
+  <ellipse cx="48" cy="52" rx="16" ry="12" fill="white"/>
+  <ellipse cx="64" cy="48" rx="20" ry="16" fill="white"/>
+  <ellipse cx="80" cy="52" rx="16" ry="12" fill="white"/>
+  
+  <!-- 下载箭头 -->
+  <path d="M64 70 L64 85 M56 77 L64 85 L72 77" 
+        stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- 文件夹图标 -->
+  <path d="M32 40 L32 88 L96 88 L96 40 Z" fill="#FFC107" stroke="#FF8F00" stroke-width="2"/>
+  <path d="M32 40 L48 32 L96 32 L96 40 Z" fill="#FFD54F" stroke="#FF8F00" stroke-width="2"/>
+  
+  <!-- 下载管理器文字 -->
+  <text x="64" y="105" text-anchor="middle" fill="#2196F3" font-family="Arial, sans-serif" font-size="12" font-weight="bold">DM</text>
+</svg>

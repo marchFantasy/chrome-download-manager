@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c /Users/mayousheng/Documents/project/DownloadManager/js/background.js)",
+      "Bash(node -c /Users/mayousheng/Documents/project/DownloadManager/popup.js)",
+      "Bash(cat /Users/mayousheng/Documents/project/DownloadManager/manifest.json)",
+      "Bash(node -c js/background.js)",
+      "Bash(node -c js/popup.js)",
+      "Bash(node -c /Users/mayousheng/Documents/project/DownloadManager/js/content.js)",
+      "Bash(node -c /Users/mayousheng/Documents/project/DownloadManager/js/popup.js)",
+      "Bash(tree -L 3 /Users/mayousheng/Documents/project/DownloadManager -I 'node_modules|.git' --dirsfirst)",
+      "Bash(node -c /Users/mayousheng/Documents/project/DownloadManager/manifest.json)",
+      "Bash(python3 -m json.tool)",
+      "Bash(echo \"  - size > 0: 显示批量操作栏，显示已选择数量\")",
+      "Bash(mkdir -p /Users/mayousheng/Documents/project/DownloadManager/_locales/en /Users/mayousheng/Documents/project/DownloadManager/_locales/zh_CN /Users/mayousheng/Documents/project/DownloadManager/_locales/ko /Users/mayousheng/Documents/project/DownloadManager/_locales/ja)",
+      "Bash(python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/manifest.json)",
+      "Bash(python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/_locales/en/messages.json)",
+      "Bash(python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/_locales/zh_CN/messages.json)",
+      "Bash(python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/_locales/ko/messages.json)",
+      "Bash(python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/_locales/ja/messages.json)",
+      "Bash(./verify_multilang.sh)",
+      "Bash(tree -L 3 -I 'node_modules|.git' --dirsfirst)",
+      "Bash(ls -lh /Users/mayousheng/Documents/project/DownloadManager/*.{html,js,css,json,sh,md})",
+      "Bash(awk '{print $9, \"\"\"\"(\"\"\"\" $5 \"\"\"\")\"\"\"\"}')",
+      "Bash(for lang in en zh_CN ko ja)",
+      "Bash(do python3 -m json.tool /Users/mayousheng/Documents/project/DownloadManager/_locales/$lang/messages.json)",
+      "Bash(echo \"✓ $lang/messages.json 格式正确\")",
+      "Bash(done)",
+      "Bash(echo \"  ✓ $lang/messages.json 格式正确\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

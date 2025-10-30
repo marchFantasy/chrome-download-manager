@@ -1,0 +1,182 @@
+{
+  "extensionName": {
+    "message": "智能下载管理器",
+    "description": "扩展名称"
+  },
+  "extensionDescription": {
+    "message": "功能强大的Chrome下载管理器，支持接管下载、批量操作、同步删除磁盘文件",
+    "description": "扩展描述"
+  },
+  "allDownloads": {
+    "message": "全部下载",
+    "description": "全部下载筛选选项"
+  },
+  "inProgress": {
+    "message": "进行中",
+    "description": "进行中筛选选项"
+  },
+  "completed": {
+    "message": "已完成",
+    "description": "已完成筛选选项"
+  },
+  "interrupted": {
+    "message": "已中断",
+    "description": "已中断筛选选项"
+  },
+  "paused": {
+    "message": "已暂停",
+    "description": "已暂停筛选选项"
+  },
+  "selectAll": {
+    "message": "全选",
+    "description": "全选按钮"
+  },
+  "clearSelection": {
+    "message": "清除选择",
+    "description": "清除选择按钮"
+  },
+  "batchPause": {
+    "message": "批量暂停",
+    "description": "批量暂停按钮"
+  },
+  "batchResume": {
+    "message": "批量继续",
+    "description": "批量继续按钮"
+  },
+  "batchCancel": {
+    "message": "批量取消",
+    "description": "批量取消按钮"
+  },
+  "batchDelete": {
+    "message": "批量删除",
+    "description": "批量删除按钮"
+  },
+  "clearCompleted": {
+    "message": "清除已完成",
+    "description": "清除已完成按钮"
+  },
+  "exportDownloads": {
+    "message": "导出下载",
+    "description": "导出下载记录按钮"
+  },
+  "importDownloads": {
+    "message": "导入下载",
+    "description": "导入下载记录按钮"
+  },
+  "openFolder": {
+    "message": "打开文件夹",
+    "description": "打开文件夹按钮"
+  },
+  "delete": {
+    "message": "删除",
+    "description": "删除按钮"
+  },
+  "confirmDelete": {
+    "message": "确认删除",
+    "description": "删除确认对话框标题"
+  },
+  "confirmBatchDelete": {
+    "message": "确认批量删除",
+    "description": "批量删除确认对话框标题"
+  },
+  "cancel": {
+    "message": "取消",
+    "description": "取消按钮"
+  },
+  "confirm": {
+    "message": "确认",
+    "description": "确认按钮"
+  },
+  "selectedCount": {
+    "message": "已选择 $1 项",
+    "description": "显示已选择项数量的文本"
+  },
+  "loadingDownloads": {
+    "message": "正在加载下载...",
+    "description": "加载中提示"
+  },
+  "noDownloads": {
+    "message": "暂无下载",
+    "description": "无下载时提示"
+  },
+  "downloadingFile": {
+    "message": "正在下载 $1",
+    "description": "下载文件状态提示"
+  },
+  "operationSuccess": {
+    "message": "操作成功",
+    "description": "成功通知"
+  },
+  "operationFailed": {
+    "message": "操作失败: $1",
+    "description": "错误通知"
+  },
+  "downloadCompleted": {
+    "message": "下载完成: ✅ $1",
+    "description": "下载完成通知"
+  },
+  "downloadFailed": {
+    "message": "下载失败: ❌ $1",
+    "description": "下载失败通知"
+  },
+  "openingFolder": {
+    "message": "正在打开文件所在目录...",
+    "description": "打开文件夹通知"
+  },
+  "downloadingStarted": {
+    "message": "下载已开始: $1",
+    "description": "下载开始通知"
+  },
+  "downloadFailure": {
+    "message": "下载失败: $1",
+    "description": "下载失败通知"
+  },
+  "downloadFailedContext": {
+    "message": "下载失败: 扩展上下文错误，请刷新页面后重试",
+    "description": "下载上下文错误通知"
+  },
+  "addDownloadBtn": {
+    "message": "添加下载",
+    "description": "添加下载按钮"
+  },
+  "statusPaused": {
+    "message": "已暂停",
+    "description": "下载暂停状态"
+  },
+  "statusInProgress": {
+    "message": "下载中",
+    "description": "下载进行中状态"
+  },
+  "statusComplete": {
+    "message": "已完成",
+    "description": "下载完成状态"
+  },
+  "statusInterrupted": {
+    "message": "已中断",
+    "description": "下载中断状态"
+  },
+  "fileNotExists": {
+    "message": "文件不存在",
+    "description": "文件不存在状态"
+  },
+  "lastUpdate": {
+    "message": "最后更新: $1",
+    "description": "最后更新时间显示"
+  },
+  "deleteConfirmMessage": {
+    "message": "确定要删除下载 \"$1\" 吗？\n\n此操作将：\n✓ 删除下载记录\n\n注意：磁盘文件需要您手动删除。",
+    "description": "删除确认消息"
+  },
+  "batchDeleteConfirmMessage": {
+    "message": "确定要删除 $1 个下载吗？\n\n此操作将：\n✓ 删除所有下载记录\n\n注意：磁盘文件需要您手动删除。",
+    "description": "批量删除确认消息"
+  },
+  "batchCancelConfirmMessage": {
+    "message": "确定要取消 $1 个下载吗？",
+    "description": "批量取消确认消息"
+  },
+  "clearCompletedConfirmMessage": {
+    "message": "确定要清除 $1 个已完成的下载吗？\n\n此操作将：\n✓ 删除所有下载记录\n\n注意：磁盘文件需要您手动删除。",
+    "description": "清除已完成确认消息"
+  }
+}

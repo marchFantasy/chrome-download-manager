@@ -1,0 +1,182 @@
+{
+  "extensionName": {
+    "message": "Smart Download Manager",
+    "description": "Name of the extension"
+  },
+  "extensionDescription": {
+    "message": "Powerful Chrome download manager supporting download interception, batch operations, and synchronous file deletion",
+    "description": "Description of the extension"
+  },
+  "allDownloads": {
+    "message": "All Downloads",
+    "description": "Filter option for all downloads"
+  },
+  "inProgress": {
+    "message": "In Progress",
+    "description": "Filter option for in-progress downloads"
+  },
+  "completed": {
+    "message": "Completed",
+    "description": "Filter option for completed downloads"
+  },
+  "interrupted": {
+    "message": "Interrupted",
+    "description": "Filter option for interrupted downloads"
+  },
+  "paused": {
+    "message": "Paused",
+    "description": "Filter option for paused downloads"
+  },
+  "selectAll": {
+    "message": "Select All",
+    "description": "Button to select all downloads"
+  },
+  "clearSelection": {
+    "message": "Clear Selection",
+    "description": "Button to clear selection"
+  },
+  "batchPause": {
+    "message": "Batch Pause",
+    "description": "Button to pause selected downloads"
+  },
+  "batchResume": {
+    "message": "Batch Resume",
+    "description": "Button to resume selected downloads"
+  },
+  "batchCancel": {
+    "message": "Batch Cancel",
+    "description": "Button to cancel selected downloads"
+  },
+  "batchDelete": {
+    "message": "Batch Delete",
+    "description": "Button to delete selected downloads"
+  },
+  "clearCompleted": {
+    "message": "Clear Completed",
+    "description": "Button to clear all completed downloads"
+  },
+  "exportDownloads": {
+    "message": "Export Downloads",
+    "description": "Button to export download history"
+  },
+  "importDownloads": {
+    "message": "Import Downloads",
+    "description": "Button to import download history"
+  },
+  "openFolder": {
+    "message": "Open Folder",
+    "description": "Button to open download folder"
+  },
+  "delete": {
+    "message": "Delete",
+    "description": "Button to delete download"
+  },
+  "confirmDelete": {
+    "message": "Confirm Delete",
+    "description": "Modal title for delete confirmation"
+  },
+  "confirmBatchDelete": {
+    "message": "Confirm Batch Delete",
+    "description": "Modal title for batch delete confirmation"
+  },
+  "cancel": {
+    "message": "Cancel",
+    "description": "Cancel button"
+  },
+  "confirm": {
+    "message": "Confirm",
+    "description": "Confirm button"
+  },
+  "selectedCount": {
+    "message": "Selected $1 items",
+    "description": "Text showing number of selected items"
+  },
+  "loadingDownloads": {
+    "message": "Loading downloads...",
+    "description": "Loading message"
+  },
+  "noDownloads": {
+    "message": "No downloads",
+    "description": "Message when there are no downloads"
+  },
+  "downloadingFile": {
+    "message": "Downloading $1",
+    "description": "Status message for downloading file"
+  },
+  "operationSuccess": {
+    "message": "Operation successful",
+    "description": "Success notification"
+  },
+  "operationFailed": {
+    "message": "Operation failed: $1",
+    "description": "Error notification"
+  },
+  "downloadCompleted": {
+    "message": "Download completed: ✅ $1",
+    "description": "Download completed notification"
+  },
+  "downloadFailed": {
+    "message": "Download failed: ❌ $1",
+    "description": "Download failed notification"
+  },
+  "openingFolder": {
+    "message": "Opening file folder...",
+    "description": "Opening folder notification"
+  },
+  "downloadingStarted": {
+    "message": "Download started: $1",
+    "description": "Download started notification"
+  },
+  "downloadFailure": {
+    "message": "Download failed: $1",
+    "description": "Download failure notification"
+  },
+  "downloadFailedContext": {
+    "message": "Download failed: Extension context error, please refresh the page and try again",
+    "description": "Download context error notification"
+  },
+  "addDownloadBtn": {
+    "message": "Add Download",
+    "description": "Button to add new download"
+  },
+  "statusPaused": {
+    "message": "Paused",
+    "description": "Status when download is paused"
+  },
+  "statusInProgress": {
+    "message": "Downloading",
+    "description": "Status when download is in progress"
+  },
+  "statusComplete": {
+    "message": "Completed",
+    "description": "Status when download is completed"
+  },
+  "statusInterrupted": {
+    "message": "Interrupted",
+    "description": "Status when download is interrupted"
+  },
+  "fileNotExists": {
+    "message": "File not found",
+    "description": "Status when file does not exist"
+  },
+  "lastUpdate": {
+    "message": "Last update: $1",
+    "description": "Last update time display"
+  },
+  "deleteConfirmMessage": {
+    "message": "Are you sure you want to delete the download \"$1\"?\n\nThis action will:\n✓ Delete the download record\n\nNote: Please delete the file from disk manually.",
+    "description": "Delete confirmation message"
+  },
+  "batchDeleteConfirmMessage": {
+    "message": "Are you sure you want to delete $1 downloads?\n\nThis action will:\n✓ Delete all download records\n\nNote: Please delete the files from disk manually.",
+    "description": "Batch delete confirmation message"
+  },
+  "batchCancelConfirmMessage": {
+    "message": "Are you sure you want to cancel $1 downloads?",
+    "description": "Batch cancel confirmation message"
+  },
+  "clearCompletedConfirmMessage": {
+    "message": "Are you sure you want to clear $1 completed downloads?\n\nThis action will:\n✓ Delete all download records\n\nNote: Please delete the files from disk manually.",
+    "description": "Clear completed downloads confirmation message"
+  }
+}

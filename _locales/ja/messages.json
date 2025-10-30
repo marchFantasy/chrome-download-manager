@@ -1,0 +1,182 @@
+{
+  "extensionName": {
+    "message": "スマートダウンロード管理器",
+    "description": "拡張機能の名前"
+  },
+  "extensionDescription": {
+    "message": "ダウンロード傍受、バッチ操作、同期ファイル削除をサポートする強力なChromeダウンロード管理器",
+    "description": "拡張機能の説明"
+  },
+  "allDownloads": {
+    "message": "すべてのダウンロード",
+    "description": "すべてのダウンロードフィルターオプション"
+  },
+  "inProgress": {
+    "message": "進行中",
+    "description": "進行中フィルターオプション"
+  },
+  "completed": {
+    "message": "完了",
+    "description": "完了フィルターオプション"
+  },
+  "interrupted": {
+    "message": "中断済み",
+    "description": "中断済みフィルターオプション"
+  },
+  "paused": {
+    "message": "一時停止",
+    "description": "一時停止フィルターオプション"
+  },
+  "selectAll": {
+    "message": "すべて選択",
+    "description": "すべて選択ボタン"
+  },
+  "clearSelection": {
+    "message": "選択をクリア",
+    "description": "選択をクリアボタン"
+  },
+  "batchPause": {
+    "message": "バッチ一時停止",
+    "description": "バッチ一時停止ボタン"
+  },
+  "batchResume": {
+    "message": "バッチ再開",
+    "description": "バッチ再開ボタン"
+  },
+  "batchCancel": {
+    "message": "バッチキャンセル",
+    "description": "バッチキャンセルボタン"
+  },
+  "batchDelete": {
+    "message": "バッチ削除",
+    "description": "バッチ削除ボタン"
+  },
+  "clearCompleted": {
+    "message": "完了項目をクリア",
+    "description": "完了した項目をクリアボタン"
+  },
+  "exportDownloads": {
+    "message": "ダウンロードをエクスポート",
+    "description": "ダウンロード記録をエクスポートボタン"
+  },
+  "importDownloads": {
+    "message": "ダウンロードをインポート",
+    "description": "ダウンロード記録をインポートボタン"
+  },
+  "openFolder": {
+    "message": "フォルダーを開く",
+    "description": "フォルダーを開くボタン"
+  },
+  "delete": {
+    "message": "削除",
+    "description": "削除ボタン"
+  },
+  "confirmDelete": {
+    "message": "削除の確認",
+    "description": "削除確認モーダルタイトル"
+  },
+  "confirmBatchDelete": {
+    "message": "バッチ削除の確認",
+    "description": "バッチ削除確認モーダルタイトル"
+  },
+  "cancel": {
+    "message": "キャンセル",
+    "description": "キャンセルボタン"
+  },
+  "confirm": {
+    "message": "確認",
+    "description": "確認ボタン"
+  },
+  "selectedCount": {
+    "message": "$1個の項目が選択されています",
+    "description": "選択された項目数表示テキスト"
+  },
+  "loadingDownloads": {
+    "message": "ダウンロードを読み込み中...",
+    "description": "ローディングメッセージ"
+  },
+  "noDownloads": {
+    "message": "ダウンロードなし",
+    "description": "ダウンロードがない場合のメッセージ"
+  },
+  "downloadingFile": {
+    "message": "$1 をダウンロード中",
+    "description": "ファイルダウンロード状態メッセージ"
+  },
+  "operationSuccess": {
+    "message": "操作成功",
+    "description": "成功通知"
+  },
+  "operationFailed": {
+    "message": "操作失敗: $1",
+    "description": "エラ通知"
+  },
+  "downloadCompleted": {
+    "message": "ダウンロード完了: ✅ $1",
+    "description": "ダウンロード完了通知"
+  },
+  "downloadFailed": {
+    "message": "ダウンロード失敗: ❌ $1",
+    "description": "ダウンロード失敗通知"
+  },
+  "openingFolder": {
+    "message": "ファイルフォルダーを開いています...",
+    "description": "フォルダーを開く通知"
+  },
+  "downloadingStarted": {
+    "message": "ダウンロード開始: $1",
+    "description": "ダウンロード開始通知"
+  },
+  "downloadFailure": {
+    "message": "ダウンロード失敗: $1",
+    "description": "ダウンロード失敗通知"
+  },
+  "downloadFailedContext": {
+    "message": "ダウンロード失敗: 拡張機能コンテキストエラー、ページを更新して再試行してください",
+    "description": "ダウンロードコンテキストエラー通知"
+  },
+  "addDownloadBtn": {
+    "message": "ダウンロード追加",
+    "description": "ダウンロード追加ボタン"
+  },
+  "statusPaused": {
+    "message": "一時停止",
+    "description": "ダウンロード一時停止状態"
+  },
+  "statusInProgress": {
+    "message": "ダウンロード中",
+    "description": "ダウンロード進行中状態"
+  },
+  "statusComplete": {
+    "message": "完了",
+    "description": "ダウンロード完了状態"
+  },
+  "statusInterrupted": {
+    "message": "中断済み",
+    "description": "ダウンロード中断状態"
+  },
+  "fileNotExists": {
+    "message": "ファイルが見つかりません",
+    "description": "ファイル不在状態"
+  },
+  "lastUpdate": {
+    "message": "最終更新: $1",
+    "description": "最終更新時間表示"
+  },
+  "deleteConfirmMessage": {
+    "message": "ダウンロード \"$1\" を削除してもよろしいですか？\n\nこの操作は:\n✓ ダウンロード記録を削除します\n\n注意: ディスク上のファイルは手動で削除してください。",
+    "description": "削除確認メッセージ"
+  },
+  "batchDeleteConfirmMessage": {
+    "message": "$1個のダウンロードを削除してもよろしいですか？\n\nこの操作は:\n✓ すべてのダウンロード記録を削除します\n\n注意: ディスク上のファイルは手動で削除してください。",
+    "description": "バッチ削除確認メッセージ"
+  },
+  "batchCancelConfirmMessage": {
+    "message": "$1個のダウンロードをキャンセルしてもよろしいですか？",
+    "description": "バッチキャンセル確認メッセージ"
+  },
+  "clearCompletedConfirmMessage": {
+    "message": "$1個の完了したダウンロードをクリアしてもよろしいですか？\n\nこの操作は:\n✓ すべてのダウンロード記録を削除します\n\n注意: ディスク上のファイルは手動で削除してください。",
+    "description": "完了したダウンロードをクリア確認メッセージ"
+  }
+}

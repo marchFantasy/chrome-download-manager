@@ -1,0 +1,182 @@
+{
+  "extensionName": {
+    "message": "스마트 다운로드 관리자",
+    "description": "확장 프로그램 이름"
+  },
+  "extensionDescription": {
+    "message": "다운로드 가로채기, 배치 작업, 동기화된 파일 삭제를 지원하는 강력한 Chrome 다운로드 관리자",
+    "description": "확장 프로그램 설명"
+  },
+  "allDownloads": {
+    "message": "모든 다운로드",
+    "description": "모든 다운로드 필터 옵션"
+  },
+  "inProgress": {
+    "message": "진행 중",
+    "description": "진행 중 필터 옵션"
+  },
+  "completed": {
+    "message": "완료됨",
+    "description": "완료됨 필터 옵션"
+  },
+  "interrupted": {
+    "message": "중단됨",
+    "description": "중단됨 필터 옵션"
+  },
+  "paused": {
+    "message": "일시중지됨",
+    "description": "일시중지됨 필터 옵션"
+  },
+  "selectAll": {
+    "message": "전체 선택",
+    "description": "전체 선택 버튼"
+  },
+  "clearSelection": {
+    "message": "선택 해제",
+    "description": "선택 해제 버튼"
+  },
+  "batchPause": {
+    "message": "배치 일시중지",
+    "description": "배치 일시중지 버튼"
+  },
+  "batchResume": {
+    "message": "배치 재개",
+    "description": "배치 재개 버튼"
+  },
+  "batchCancel": {
+    "message": "배치 취소",
+    "description": "배치 취소 버튼"
+  },
+  "batchDelete": {
+    "message": "배치 삭제",
+    "description": "배치 삭제 버튼"
+  },
+  "clearCompleted": {
+    "message": "완료 항목 지우기",
+    "description": "완료된 항목 지우기 버튼"
+  },
+  "exportDownloads": {
+    "message": "다운로드 내보내기",
+    "description": "다운로드 기록 내보내기 버튼"
+  },
+  "importDownloads": {
+    "message": "다운로드 가져오기",
+    "description": "다운로드 기록 가져오기 버튼"
+  },
+  "openFolder": {
+    "message": "폴더 열기",
+    "description": "폴더 열기 버튼"
+  },
+  "delete": {
+    "message": "삭제",
+    "description": "삭제 버튼"
+  },
+  "confirmDelete": {
+    "message": "삭제 확인",
+    "description": "삭제 확인 모달 제목"
+  },
+  "confirmBatchDelete": {
+    "message": "배치 삭제 확인",
+    "description": "배치 삭제 확인 모달 제목"
+  },
+  "cancel": {
+    "message": "취소",
+    "description": "취소 버튼"
+  },
+  "confirm": {
+    "message": "확인",
+    "description": "확인 버튼"
+  },
+  "selectedCount": {
+    "message": "$1개 항목 선택됨",
+    "description": "선택된 항목 수 표시 텍스트"
+  },
+  "loadingDownloads": {
+    "message": "다운로드 로딩 중...",
+    "description": "로딩 메시지"
+  },
+  "noDownloads": {
+    "message": "다운로드 없음",
+    "description": "다운로드가 없을 때 메시지"
+  },
+  "downloadingFile": {
+    "message": "$1 다운로드 중",
+    "description": "파일 다운로드 상태 메시지"
+  },
+  "operationSuccess": {
+    "message": "작업 성공",
+    "description": "성공 알림"
+  },
+  "operationFailed": {
+    "message": "작업 실패: $1",
+    "description": "오류 알림"
+  },
+  "downloadCompleted": {
+    "message": "다운로드 완료: ✅ $1",
+    "description": "다운로드 완료 알림"
+  },
+  "downloadFailed": {
+    "message": "다운로드 실패: ❌ $1",
+    "description": "다운로드 실패 알림"
+  },
+  "openingFolder": {
+    "message": "파일 폴더를 여는 중...",
+    "description": "폴더 열기 알림"
+  },
+  "downloadingStarted": {
+    "message": "다운로드 시작: $1",
+    "description": "다운로드 시작 알림"
+  },
+  "downloadFailure": {
+    "message": "다운로드 실패: $1",
+    "description": "다운로드 실패 알림"
+  },
+  "downloadFailedContext": {
+    "message": "다운로드 실패: 확장 컨텍스트 오류, 페이지를 새로고침하고 다시 시도하세요",
+    "description": "다운로드 컨텍스트 오류 알림"
+  },
+  "addDownloadBtn": {
+    "message": "다운로드 추가",
+    "description": "다운로드 추가 버튼"
+  },
+  "statusPaused": {
+    "message": "일시중지됨",
+    "description": "다운로드 일시중지 상태"
+  },
+  "statusInProgress": {
+    "message": "다운로드 중",
+    "description": "다운로드 진행 중 상태"
+  },
+  "statusComplete": {
+    "message": "완료됨",
+    "description": "다운로드 완료 상태"
+  },
+  "statusInterrupted": {
+    "message": "중단됨",
+    "description": "다운로드 중단 상태"
+  },
+  "fileNotExists": {
+    "message": "파일을 찾을 수 없습니다",
+    "description": "파일 부재 상태"
+  },
+  "lastUpdate": {
+    "message": "마지막 업데이트: $1",
+    "description": "마지막 업데이트 시간 표시"
+  },
+  "deleteConfirmMessage": {
+    "message": "다운로드 \"$1\"을(를) 삭제하시겠습니까?\n\n이 작업은:\n✓ 다운로드 기록을 삭제합니다\n\n참고: 디스크의 파일은 수동으로 삭제해 주세요.",
+    "description": "삭제 확인 메시지"
+  },
+  "batchDeleteConfirmMessage": {
+    "message": "$1개의 다운로드를 삭제하시겠습니까?\n\n이 작업은:\n✓ 모든 다운로드 기록을 삭제합니다\n\n참고: 디스크의 파일은 수동으로 삭제해 주세요.",
+    "description": "배치 삭제 확인 메시지"
+  },
+  "batchCancelConfirmMessage": {
+    "message": "$1개의 다운로드를 취소하시겠습니까?",
+    "description": "배치 취소 확인 메시지"
+  },
+  "clearCompletedConfirmMessage": {
+    "message": "$1개의 완료된 다운로드를 지우시겠습니까?\n\n이 작업은:\n✓ 모든 다운로드 기록을 삭제합니다\n\n참고: 디스크의 파일은 수동으로 삭제해 주세요.",
+    "description": "완료된 다운로드 지우기 확인 메시지"
+  }
+}

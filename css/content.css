@@ -1,0 +1,39 @@
+/* 智能下载管理器 - 内容脚本样式 */
+/* 为页面上的媒体元素添加下载按钮样式 */
+
+.download-manager-btn {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 3px !important;
+  padding: 4px 6px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  z-index: 9999 !important;
+  transition: all 0.2s ease !important;
+  opacity: 0.7 !important;
+}
+
+.download-manager-btn:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+  transform: scale(1.1) !important;
+}
+
+.download-manager-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* 为媒体元素添加相对定位包装器 */
+.download-manager-wrapper {
+  position: relative !important;
+  display: inline-block !important;
+}
+
+/* 隐藏原始的右键菜单（可选） */
+.download-manager-hidden-menu {
+  /* 可以添加样式来隐藏或修改原始右键菜单 */
+}
