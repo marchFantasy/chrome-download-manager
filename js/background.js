@@ -1,12 +1,16 @@
 // 智能下载管理器 - 后台脚本
 // 处理下载事件和管理下载状态
 
+// 引入核心下载器
+importScripts('/js/core/downloader.js');
+
 class DownloadManager {
   constructor() {
-    this.downloads = new Map(); // 存储下载信息
+    this.downloads = new Map(); // 存储下载信息 (包含 Downloader 实例)
     this.downloadCount = 0; // 活跃下载数量
     this.animationInterval = null;
     this.fileCheckTimer = null; // 文件检查定时器
+    this.internalDownloadIds = new Set(); // 追踪由本扩展发起的下载ID（用于最终保存文件）
     this.init();
   }
 
@@ -172,58 +176,30 @@ class DownloadManager {
     return new Promise(async (resolve, reject) => {
       try {
         console.log(`删除下载记录: ID ${downloadId}`);
+        
+        // 1. 检查是否为内部下载
+        const downloadInfo = this.downloads.get(downloadId);
+        if (downloadInfo && downloadInfo.downloader) {
+            // 如果正在下载，先取消
+            downloadInfo.downloader.cancel();
+        }
 
-        // 先查询下载项信息
-        chrome.downloads.search({id: downloadId}, (downloads) => {
-          if (chrome.runtime.lastError) {
-            console.error('查询下载项失败:', chrome.runtime.lastError);
-            reject(chrome.runtime.lastError);
-            return;
-          }
+        // 2. 从内存和存储中移除
+        this.downloads.delete(downloadId);
+        this.removeDownloadInfo(downloadId);
+        
+        // 3. 尝试从Chrome历史中移除（如果是已保存的文件）
+        // 注意：这里我们主要管理自己的记录，Chrome的历史记录作为辅助
+        // 如果有对应的Chrome Download ID (finalDownloadId)，也尝试删除
+        if (downloadInfo && downloadInfo.finalDownloadId) {
+             chrome.downloads.erase({id: downloadInfo.finalDownloadId}, () => {
+                 if (chrome.runtime.lastError) console.warn('删除Chrome记录失败:', chrome.runtime.lastError);
+             });
+        }
 
-          if (!downloads || downloads.length === 0) {
-            console.warn('下载项不存在:', downloadId);
-            resolve();
-            return;
-          }
+        console.log(`✅ 下载记录已删除: ID ${downloadId}`);
+        resolve();
 
-          const downloadItem = downloads[0];
-
-          // 1. 先删除磁盘文件（如果存在）
-          if (downloadItem.exists) {
-            chrome.downloads.removeFile(downloadId, () => {
-              if (chrome.runtime.lastError) {
-                console.warn('⚠️ 删除磁盘文件失败:', chrome.runtime.lastError.message);
-              } else {
-                console.log('✅ 磁盘文件已删除:', downloadItem.filename);
-              }
-
-              // 2. 然后从下载历史中删除记录
-              chrome.downloads.erase({id: downloadId}, (erasedItems) => {
-                if (chrome.runtime.lastError) {
-                  console.error('删除下载记录失败:', chrome.runtime.lastError);
-                  reject(chrome.runtime.lastError);
-                } else {
-                  console.log(`✅ 下载记录已删除: ID ${downloadId}`);
-                  resolve();
-                }
-              });
-            });
-          } else {
-            console.warn('⚠️ 文件已不存在:', downloadItem.filename);
-
-            // 3. 直接从下载历史中删除记录
-            chrome.downloads.erase({id: downloadId}, (erasedItems) => {
-              if (chrome.runtime.lastError) {
-                console.error('删除下载记录失败:', chrome.runtime.lastError);
-                reject(chrome.runtime.lastError);
-              } else {
-                console.log(`✅ 下载记录已删除: ID ${downloadId}`);
-                resolve();
-              }
-            });
-          }
-        });
       } catch (error) {
         console.error('删除下载时发生错误:', error);
         reject(error);
@@ -269,199 +245,184 @@ class DownloadManager {
 
   // 检查文件是否存在（仅限HTTP/HTTPS）
   async checkFileExists(downloadItem) {
-    return new Promise((resolve) => {
-      try {
-        const url = downloadItem.url;
-        const filename = downloadItem.filename;
-
-        // 只检查HTTP/HTTPS URL
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-          console.log('非HTTP/HTTPS文件，跳过检查:', filename);
-          resolve(true); // 对于本地文件，无法检查
-          return;
-        }
-
-        // 检查danger字段（文件被标记为危险时表示可能不存在）
-        if (downloadItem.danger && downloadItem.danger !== 'safe') {
-          console.log('文件被标记为危险，可能不存在:', filename);
-          resolve(false);
-          return;
-        }
-
-        // 使用exists字段检查文件是否存在（Chrome API提供）
-        // 注意：exists字段可能不存在，需要确保在正确的环境下使用
-        if (downloadItem.exists !== undefined) {
-          console.log(`使用exists字段检查 ${filename}: ${downloadItem.exists}`);
-          resolve(downloadItem.exists);
-          return;
-        }
-
-        // 如果exists字段不存在，尝试fetch检查
-        console.log('exists字段不存在，使用fetch检查:', filename);
-        fetch(url, {method: 'HEAD'})
-          .then(response => {
-            if (response.ok) {
-              console.log('文件存在:', filename);
-              resolve(true);
-            } else {
-              console.log('文件不存在（HTTP状态:', response.status, '）:', filename);
-              resolve(false);
-            }
-          })
-          .catch(error => {
-            console.log('文件检查失败:', filename, error);
-            // 检查失败时，尝试下载检查
-            fetch(url, {method: 'GET'})
-              .then(response => {
-                resolve(response.ok);
-              })
-              .catch(() => resolve(false));
-          });
-      } catch (error) {
-        console.error('检查文件存在性时发生错误:', error);
-        resolve(true); // 检查失败时默认为存在
-      }
-    });
+    // 对于内部下载，如果已完成，我们假设文件存在（除非用户手动删除了）
+    // 这里简化处理，只对Chrome原生下载做检查，或者后续实现文件系统访问
+    return true; 
   }
 
   // 批量检查文件存在性
   async batchCheckFiles() {
-    console.log('开始批量检查文件存在性...');
-    chrome.downloads.search({state: 'complete'}, (downloads) => {
-      if (chrome.runtime.lastError) {
-        console.error('搜索下载失败:', chrome.runtime.lastError);
-        return;
-      }
+    // 暂不实现复杂的批量检查，因为现在主要依赖内部状态
+    console.log('批量检查文件存在性 (跳过)');
+  }
 
-      if (!downloads || downloads.length === 0) {
-        console.log('没有完成的下载');
-        return;
-      }
+  // 核心：开始内部下载
+  startInternalDownload(url, filename) {
+      const downloader = new Downloader(url, filename);
+      
+      const downloadInfo = {
+          id: downloader.id, // 使用 Downloader 生成的 ID
+          url: url,
+          filename: filename,
+          state: 'in_progress',
+          bytesReceived: 0,
+          totalBytes: 0,
+          startTime: Date.now(),
+          endTime: null,
+          paused: false,
+          error: null,
+          speed: 0,
+          downloader: downloader // 引用实例，不保存到 storage
+      };
 
-      console.log(`找到 ${downloads.length} 个完成的下载，开始检查...`);
+      // 绑定回调
+      downloader.onProgress = (data) => {
+          downloadInfo.bytesReceived = data.bytesReceived;
+          downloadInfo.totalBytes = data.totalBytes;
+          downloadInfo.speed = data.speed;
+          downloadInfo.state = data.state;
+          
+          // 实时保存状态（可选：为了性能可以减少保存频率）
+          // this.saveDownloadInfo(downloadInfo); 
+          
+          // 发送进度更新给 popup (如果打开)
+          chrome.runtime.sendMessage({
+              action: 'downloadProgress',
+              data: downloadInfo
+          }).catch(() => {});
+      };
 
-      downloads.forEach(async (download) => {
-        try {
-          const exists = await this.checkFileExists(download);
-          if (!exists) {
-            console.log('文件不存在，标记为已删除:', download.filename);
-            // 更新下载信息，标记为不存在
-            const downloadInfo = this.downloads.get(download.id);
-            if (downloadInfo) {
-              downloadInfo.fileNotExists = true;
+      downloader.onComplete = async (data) => {
+          downloadInfo.state = 'complete';
+          downloadInfo.endTime = Date.now();
+          downloadInfo.blob = data.blob; // 暂存 Blob
+          
+          console.log(`内部下载完成: ${filename}, 开始保存到磁盘...`);
+          
+          // 保存文件到磁盘
+          // 注意: Service Worker 不支持 URL.createObjectURL
+          // 我们需要使用 FileReader 将 Blob 转换为 Data URL
+          try {
+              const reader = new FileReader();
+              
+              reader.onload = () => {
+                  const dataUrl = reader.result;
+                  
+                  // 使用 Data URL 创建下载
+                  // 注意：必须先添加到 internalDownloadIds，然后再调用 download
+                  // 否则会在 onCreated 中被拦截
+                  const tempId = 'pending_' + Date.now();
+                  
+                  chrome.downloads.download({
+                      url: dataUrl,
+                      filename: filename,
+                      saveAs: false // 自动保存，不弹窗
+                  }, (downloadId) => {
+                      if (chrome.runtime.lastError) {
+                          console.error('保存文件失败:', chrome.runtime.lastError);
+                          downloadInfo.error = chrome.runtime.lastError.message;
+                          downloadInfo.state = 'interrupted';
+                      } else {
+                          console.log(`文件保存任务已创建，Chrome ID: ${downloadId}`);
+                          // 立即标记为内部下载，防止被拦截
+                          this.internalDownloadIds.add(downloadId);
+                          downloadInfo.finalDownloadId = downloadId; // 关联 Chrome ID
+                      }
+                      this.saveDownloadInfo(downloadInfo);
+                      this.showNotification('下载完成', `✅ ${filename}`);
+                      this.flashBadgeForCompletion();
+                  });
+              };
+              
+              reader.onerror = () => {
+                  console.error('Blob 转换失败:', reader.error);
+                  downloadInfo.error = 'Blob 转换失败';
+                  downloadInfo.state = 'interrupted';
+                  this.saveDownloadInfo(downloadInfo);
+              };
+              
+              // 开始转换
+              reader.readAsDataURL(data.blob);
+          } catch (e) {
+              console.error('保存流程异常:', e);
+              downloadInfo.error = e.message;
+              downloadInfo.state = 'interrupted';
               this.saveDownloadInfo(downloadInfo);
-            }
           }
-        } catch (error) {
-          console.error('检查文件存在性时发生错误:', error);
-        }
-      });
-    });
+      };
+
+      downloader.onError = (data) => {
+          downloadInfo.state = 'interrupted';
+          downloadInfo.error = data.error;
+          this.saveDownloadInfo(downloadInfo);
+          this.showNotification('下载失败', `❌ ${filename}`);
+      };
+
+      // 存储并开始
+      this.downloads.set(downloadInfo.id, downloadInfo);
+      this.saveDownloadInfo(downloadInfo);
+      
+      downloader.start();
+      this.showDownloadAnimation(filename);
   }
 
   // 下载创建事件
   onDownloadCreated(downloadItem) {
     console.log('下载创建事件:', downloadItem);
 
-    try {
-      // 确保state字段有有效值
-      let state = downloadItem.state;
-      if (!state || state === '' || state === undefined) {
-        state = 'in_progress'; // 默认状态
-      }
-
-      const downloadInfo = {
-        id: downloadItem.id,
-        url: downloadItem.url,
-        // 优先使用纯文件名，避免显示完整路径
-        filename: this.extractBaseFilename(downloadItem.filename) || this.extractFilename(downloadItem.url),
-        mimeType: downloadItem.mime || '',
-        state: state,
-        bytesReceived: downloadItem.bytesReceived || 0,
-        totalBytes: downloadItem.totalBytes || 0,
-        startTime: Date.now(),
-        endTime: null,
-        paused: false,
-        error: null
-      };
-
-      this.downloads.set(downloadItem.id, downloadInfo);
-      this.saveDownloadInfo(downloadInfo);
-
-      // 显示下载动画和通知
-      this.showDownloadAnimation(downloadInfo.filename);
-
-      console.log(`下载记录已保存: ${downloadInfo.filename} (ID: ${downloadItem.id}, 状态: ${state})`);
-    } catch (error) {
-      console.error('处理下载创建事件失败:', error);
+    // 1. 检查是否是我们自己发起的最终保存任务
+    if (this.internalDownloadIds.has(downloadItem.id)) {
+        console.log('检测到内部保存任务，放行:', downloadItem.id);
+        this.internalDownloadIds.delete(downloadItem.id); // 用完即删
+        return;
     }
+
+    // 2. 检查是否是 Blob URL 或 Data URL (我们自己生成的)
+    if (downloadItem.url.startsWith('blob:') || downloadItem.url.startsWith('data:')) {
+        console.log('检测到 Blob/Data URL，放行:', downloadItem.url.substring(0, 50) + '...');
+        return;
+    }
+
+    // 3. 拦截普通下载
+    console.log('拦截到外部下载，准备接管:', downloadItem.url);
+    
+    // 取消原生下载
+    chrome.downloads.cancel(downloadItem.id, () => {
+        if (chrome.runtime.lastError) {
+            console.warn('取消原生下载失败:', chrome.runtime.lastError);
+        } else {
+            console.log('原生下载已取消');
+            // 删除原生记录，保持历史干净
+            chrome.downloads.erase({id: downloadItem.id});
+        }
+    });
+
+    // 启动内部下载
+    const filename = this.extractBaseFilename(downloadItem.filename) || this.extractFilename(downloadItem.url);
+    this.startInternalDownload(downloadItem.url, filename);
   }
 
   // 下载状态变化事件
   onDownloadChanged(downloadDelta) {
-    const downloadInfo = this.downloads.get(downloadDelta.id);
-    if (!downloadInfo) return;
-
-    // 更新下载信息
-    if (downloadDelta.filename) {
-      const newFilename = downloadDelta.filename.newValue;
-      if (newFilename) {
-        downloadInfo.filename = this.extractBaseFilename(newFilename);
-      } else {
-        // 文件名变为空，仅记录日志但不标记状态
-        console.log(`检测到文件名为空 (ID: ${downloadDelta.id})`);
-        // 注意：已移除文件删除标记功能
-      }
+    // 我们主要关注内部下载的状态，这里只处理 Chrome 原生下载的变化（如果是我们关联的）
+    // 比如用户在浏览器下载页取消了最终的保存任务
+    
+    // 查找关联的内部下载
+    for (const [id, info] of this.downloads.entries()) {
+        if (info.finalDownloadId === downloadDelta.id) {
+            if (downloadDelta.state && downloadDelta.state.newValue === 'interrupted') {
+                console.warn('最终保存任务被中断');
+                info.state = 'interrupted';
+                info.error = '文件保存被中断';
+                this.saveDownloadInfo(info);
+            }
+        }
     }
-    if (downloadDelta.state) {
-      downloadInfo.state = downloadDelta.state.newValue;
-    }
-    if (downloadDelta.bytesReceived) {
-      downloadInfo.bytesReceived = downloadDelta.bytesReceived.newValue;
-    }
-    if (downloadDelta.totalBytes) {
-      downloadInfo.totalBytes = downloadDelta.totalBytes.newValue;
-    }
-
-    // 检查下载完成
-    if (downloadDelta.state && downloadDelta.state.newValue === 'complete') {
-      // 设置完成时间为当前时间（用于10秒缓冲期检查）
-      const completionTime = Date.now();
-      downloadInfo.endTime = completionTime;
-
-      console.log(`下载完成 (ID: ${downloadInfo.id}): ${downloadInfo.filename}, 完成时间: ${completionTime}`);
-
-      // 显示完成通知
-      this.showNotification('下载完成', `✅ ${downloadInfo.filename}`);
-
-      // 完成闪烁提示
-      this.flashBadgeForCompletion();
-
-      // 更新下载计数
-      this.downloadCount = Math.max(0, this.downloadCount - 1);
-      this.updateBadge();
-    }
-
-    // 检查下载错误
-    if (downloadDelta.state && downloadDelta.state.newValue === 'interrupted') {
-      downloadInfo.error = '下载被中断';
-      this.showNotification('下载失败', `❌ ${downloadInfo.filename}`);
-    }
-
-    this.saveDownloadInfo(downloadInfo);
   }
 
   // 下载删除事件
   onDownloadErased(downloadId) {
-    console.log('下载删除:', downloadId);
-
-    // 注意：已移除文件删除标记功能
-
-    // 延迟删除，给UI时间更新状态
-    setTimeout(() => {
-      this.downloads.delete(downloadId);
-      this.removeDownloadInfo(downloadId);
-    }, 100);
+    // 忽略
   }
 
   // 提取文件名（从完整路径中获取纯文件名+扩展名）
@@ -469,33 +430,63 @@ class DownloadManager {
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
-      return filename || '未知文件';
+      let filename = pathname.substring(pathname.lastIndexOf('/') + 1);
+      
+      // 如果文件名为空或只是查询参数，尝试从 URL 的其他部分提取
+      if (!filename || filename.includes('?')) {
+        filename = pathname.split('/').filter(p => p).pop() || '';
+      }
+      
+      // 移除查询参数
+      filename = filename.split('?')[0];
+      
+      // 如果仍然没有文件名，使用域名 + 时间戳
+      if (!filename) {
+        const hostname = urlObj.hostname.replace(/\./g, '_');
+        filename = `${hostname}_${Date.now()}`;
+      }
+      
+      // 确保有扩展名，如果没有则添加默认扩展名
+      if (!filename.includes('.')) {
+        filename += '.download';
+      }
+      
+      return filename;
     } catch (e) {
-      return '未知文件';
+      console.error('提取文件名失败:', e);
+      return `download_${Date.now()}.download`;
     }
   }
 
   // 从完整文件路径中提取纯文件名
   extractBaseFilename(filePath) {
     try {
-      if (!filePath) return '未知文件';
+      if (!filePath) return null;
       // Windows 路径使用 \，Unix/Linux 使用 /
       const normalizedPath = filePath.replace(/\\/g, '/');
       const filename = normalizedPath.substring(normalizedPath.lastIndexOf('/') + 1);
-      return filename || '未知文件';
+      
+      // 如果提取出的文件名为空或无效，返回 null
+      if (!filename || filename.trim() === '') {
+        return null;
+      }
+      
+      return filename;
     } catch (e) {
-      return '未知文件';
+      return null;
     }
   }
 
   // 获取所有下载信息（按时间倒序，最新的在最上面）
   getAllDownloads() {
-    const downloads = Array.from(this.downloads.values());
+    const downloads = Array.from(this.downloads.values()).map(d => {
+        // 移除 downloader 实例和大数据对象，只返回必要数据
+        const { downloader, blob, dataUrl, ...rest } = d;
+        return rest;
+    });
 
     // 按开始时间倒序排列，最新的在最上面
     downloads.sort((a, b) => {
-      // 优先使用endTime，如果没有则使用startTime
       const timeA = b.endTime || b.startTime || 0;
       const timeB = a.endTime || a.startTime || 0;
       return timeA - timeB;
@@ -504,57 +495,52 @@ class DownloadManager {
     return downloads;
   }
 
-  // 检查是否为HTML页面（调用全局函数）
-  isHtmlPage(url) {
-    return isHtmlPage(url);
-  }
-
   // 暂停下载
   pauseDownload(downloadId) {
     return new Promise((resolve, reject) => {
-      chrome.downloads.pause(downloadId, () => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else {
-          const downloadInfo = this.downloads.get(downloadId);
-          if (downloadInfo) {
+        const downloadInfo = this.downloads.get(downloadId);
+        if (downloadInfo && downloadInfo.downloader) {
+            downloadInfo.downloader.pause();
             downloadInfo.paused = true;
+            downloadInfo.state = 'paused';
             this.saveDownloadInfo(downloadInfo);
-          }
-          resolve();
+            resolve();
+        } else {
+            reject(new Error('下载任务不存在或已完成'));
         }
-      });
     });
   }
 
   // 继续下载
   resumeDownload(downloadId) {
     return new Promise((resolve, reject) => {
-      chrome.downloads.resume(downloadId, () => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else {
-          const downloadInfo = this.downloads.get(downloadId);
-          if (downloadInfo) {
+        const downloadInfo = this.downloads.get(downloadId);
+        if (downloadInfo && downloadInfo.downloader) {
+            downloadInfo.downloader.resume();
             downloadInfo.paused = false;
+            downloadInfo.state = 'in_progress';
             this.saveDownloadInfo(downloadInfo);
-          }
-          resolve();
+            resolve();
+        } else {
+            // 如果是持久化恢复（重启浏览器后），需要重新创建 Downloader
+            // 这里暂未实现完全的持久化恢复
+            reject(new Error('下载任务无法恢复'));
         }
-      });
     });
   }
 
   // 取消下载
   cancelDownload(downloadId) {
     return new Promise((resolve, reject) => {
-      chrome.downloads.cancel(downloadId, () => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
+        const downloadInfo = this.downloads.get(downloadId);
+        if (downloadInfo && downloadInfo.downloader) {
+            downloadInfo.downloader.cancel();
+            downloadInfo.state = 'interrupted';
+            this.saveDownloadInfo(downloadInfo);
+            resolve();
         } else {
-          resolve();
+            reject(new Error('下载任务不存在'));
         }
-      });
     });
   }
 
@@ -570,8 +556,10 @@ class DownloadManager {
 
   // 保存下载信息到存储
   saveDownloadInfo(downloadInfo) {
+    // 移除不应序列化的字段
+    const { downloader, blob, ...dataToSave } = downloadInfo;
     chrome.storage.local.set({
-      [`download_${downloadInfo.id}`]: downloadInfo
+      [`download_${downloadInfo.id}`]: dataToSave
     });
   }
 
@@ -592,39 +580,17 @@ class DownloadManager {
       let count = 0;
       for (const [key, value] of Object.entries(items)) {
         if (key.startsWith('download_') && value) {
-          // 确保所有字段都有有效值
-          if (!value.state || value.state === undefined || value.state === '') {
-            value.state = 'in_progress'; // 默认状态
+          // 恢复时，所有未完成的任务标记为中断（因为没有实现持久化断点续传）
+          if (value.state === 'in_progress' || value.state === 'paused') {
+              value.state = 'interrupted';
+              value.error = '会话已过期';
           }
-          if (value.paused === undefined) {
-            value.paused = false;
-          }
-          if (value.bytesReceived === undefined) {
-            value.bytesReceived = 0;
-          }
-          if (value.totalBytes === undefined) {
-            value.totalBytes = 0;
-          }
-          // 提取纯文件名（移除路径）
-          if (value.filename) {
-            value.filename = this.extractBaseFilename(value.filename);
-          }
-
+          
           this.downloads.set(value.id, value);
           count++;
         }
       }
       console.log(`已加载 ${count} 个下载记录`);
-
-      // 通知popup已加载完成
-      this.notifyPopupLoaded();
-    });
-  }
-
-  // 通知popup已加载完成
-  notifyPopupLoaded() {
-    chrome.runtime.sendMessage({action: 'downloadsLoaded', count: this.downloads.size}).catch(() => {
-      // popup可能未打开，忽略错误
     });
   }
 
@@ -675,7 +641,7 @@ const downloadManager = new DownloadManager();
 
 // 处理来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('收到消息:', request);
+  // console.log('收到消息:', request);
   
   try {
     switch (request.action) {
@@ -685,46 +651,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
       case 'getDownloads':
         try {
-          console.log('获取下载列表，当前数量:', downloadManager.downloads.size);
           const downloads = downloadManager.getAllDownloads();
-
-          // 主动查询Chrome API获取最新状态
-          chrome.downloads.search({}, (chromeDownloads) => {
-            if (chrome.runtime.lastError) {
-              console.error('查询Chrome下载API失败:', chrome.runtime.lastError);
-              sendResponse({success: true, downloads: downloads});
-              return;
-            }
-
-            // 合并最新状态到我们的下载列表
-            const downloadsWithLatestState = downloads.map(download => {
-              const chromeDownload = chromeDownloads.find(cd => cd.id === download.id);
-              if (chromeDownload) {
-                // 使用Chrome API的最新状态，确保state字段有效
-                const newState = (chromeDownload.state && chromeDownload.state !== '' && chromeDownload.state !== undefined)
-                  ? chromeDownload.state
-                  : (download.state || 'in_progress');
-
-                // 提取纯文件名（移除路径）
-                const newFilename = chromeDownload.filename || download.filename;
-                const pureFilename = downloadManager.extractBaseFilename(newFilename);
-
-                return {
-                  ...download,
-                  state: newState,
-                  bytesReceived: chromeDownload.bytesReceived || 0,
-                  totalBytes: chromeDownload.totalBytes || 0,
-                  filename: pureFilename,
-                  mimeType: chromeDownload.mimeType || chromeDownload.mime || download.mimeType || '',
-                  endTime: chromeDownload.endTime || download.endTime
-                };
-              }
-              return download;
-            });
-
-            console.log(`返回 ${downloadsWithLatestState.length} 个下载记录`);
-            sendResponse({success: true, downloads: downloadsWithLatestState});
-          });
+          sendResponse({success: true, downloads: downloads});
         } catch (error) {
           console.error('获取下载列表失败:', error);
           sendResponse({success: false, error: error.message});
@@ -734,189 +662,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case 'pauseDownload':
         downloadManager.pauseDownload(request.downloadId)
           .then(() => sendResponse({success: true}))
-          .catch(error => {
-            console.error('暂停下载失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
       
       case 'resumeDownload':
         downloadManager.resumeDownload(request.downloadId)
           .then(() => sendResponse({success: true}))
-          .catch(error => {
-            console.error('恢复下载失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
       
       case 'cancelDownload':
         downloadManager.cancelDownload(request.downloadId)
           .then(() => sendResponse({success: true}))
-          .catch(error => {
-            console.error('取消下载失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
 
       case 'eraseDownload':
         downloadManager.eraseDownload(request.downloadId)
           .then(() => sendResponse({success: true}))
-          .catch(error => {
-            console.error('删除下载失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
 
       case 'batchPause':
         downloadManager.batchPause(request.downloadIds)
           .then(results => sendResponse({success: true, results}))
-          .catch(error => {
-            console.error('批量暂停失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
       
       case 'batchResume':
         downloadManager.batchResume(request.downloadIds)
           .then(results => sendResponse({success: true, results}))
-          .catch(error => {
-            console.error('批量恢复失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
       
       case 'batchCancel':
         downloadManager.batchCancel(request.downloadIds)
           .then(results => sendResponse({success: true, results}))
-          .catch(error => {
-            console.error('批量取消失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
 
       case 'batchErase':
         downloadManager.batchErase(request.downloadIds)
           .then(results => sendResponse({success: true, results}))
-          .catch(error => {
-            console.error('批量删除失败:', error);
-            sendResponse({success: false, error: error.message});
-          });
+          .catch(error => sendResponse({success: false, error: error.message}));
         break;
-
-      case 'createDownload':
-        // 已删除主动创建下载的逻辑
-        // 让浏览器正常处理链接，使用 chrome.downloads.onCreated 监听所有下载
-        console.log('[DEBUG] 收到createDownload请求，但忽略，让浏览器正常处理:', request.url);
-        sendResponse({success: true, message: '浏览器将正常处理此链接'});
-        break;
-
-      case 'openDownloadFolder':
-        const openFolderId = request.downloadId;
-        console.log('[DEBUG] 打开下载文件夹:', openFolderId);
-
-        try {
-          chrome.downloads.show(openFolderId);
-          console.log('[SUCCESS] 文件夹已打开，下载ID:', openFolderId);
-          sendResponse({success: true, message: '文件夹已打开'});
-        } catch (error) {
-          console.error('[ERROR] 打开文件夹失败:', error);
-          sendResponse({success: false, error: error.message});
-        }
-        break;
-
-      case 'checkFileExists':
-        if (!request.downloadId) {
-          sendResponse({success: false, error: '缺少下载ID'});
+        
+      case 'syncFileStatus':
+          // 我们的实现不需要手动同步，直接返回成功
+          sendResponse({success: true});
           break;
-        }
-
-        try {
-          const downloadId = parseInt(request.downloadId);
-          if (isNaN(downloadId)) {
-            sendResponse({success: false, error: '无效的下载ID'});
-            break;
-          }
-
-          // 查找下载项
-          chrome.downloads.search({id: downloadId}, (downloads) => {
-            if (chrome.runtime.lastError) {
-              console.error('查询下载项失败:', chrome.runtime.lastError);
-              sendResponse({success: false, error: chrome.runtime.lastError.message});
-              return;
-            }
-
-            if (!downloads || downloads.length === 0) {
-              sendResponse({success: false, error: '下载项不存在'});
-              return;
-            }
-
-            const download = downloads[0];
-            downloadManager.checkFileExists(download)
-              .then(exists => {
-                sendResponse({success: true, exists: exists});
-              })
-              .catch(error => {
-                console.error('检查文件存在性失败:', error);
-                sendResponse({success: false, error: error.message});
-              });
-          });
-        } catch (error) {
-          console.error('检查文件存在性异常:', error);
-          sendResponse({success: false, error: error.message});
-        }
-        break;
-
+          
       case 'checkAllFiles':
-        try {
-          downloadManager.batchCheckFiles();
-          sendResponse({success: true, message: '文件检查已开始'});
-        } catch (error) {
-          console.error('批量检查文件失败:', error);
-          sendResponse({success: false, error: error.message});
-        }
-        break;
-
-      case 'startFileCheck':
-        try {
-          downloadManager.startFileCheckTimer();
-          sendResponse({success: true, message: '文件检查定时器已启动'});
-        } catch (error) {
-          console.error('启动文件检查定时器失败:', error);
-          sendResponse({success: false, error: error.message});
-        }
-        break;
-
-      case 'cancelFileCheck':
-        try {
-          downloadManager.cancelFileCheckTimer();
-          sendResponse({success: true, message: '文件检查定时器已取消'});
-        } catch (error) {
-          console.error('取消文件检查定时器失败:', error);
-          sendResponse({success: false, error: error.message});
-        }
-        break;
-
-      default:
-        console.warn('未知操作:', request.action);
-        sendResponse({success: false, error: '未知操作'});
+          sendResponse({success: true});
+          break;
     }
   } catch (error) {
-    console.error('处理消息时发生错误:', error);
+    console.error('处理消息异常:', error);
     sendResponse({success: false, error: error.message});
   }
   
-  return true; // 保持消息通道开放
+  return true; // 保持消息通道开启
 });
-
-// 右键菜单点击监听
-// 提取文件名的辅助函数
-function extractFilename(url) {
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname;
-    const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
-    return filename || '未知文件';
-  } catch (e) {
-    return '未知文件';
-  }
-}

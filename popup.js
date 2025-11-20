@@ -187,27 +187,22 @@ class PopupManager {
     this.bindEvents();
     this.checkBackgroundScript();
     this.loadDownloads();
-
-    // 添加页面卸载事件监听器，取消文件检查定时器
-    window.addEventListener('beforeunload', () => {
-      console.log('popup即将关闭，取消文件检查定时器');
-      this.sendMessage({action: 'cancelFileCheck'});
-    });
-
-    // 添加页面可见性变化事件监听器
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        // 页面隐藏时，取消定时器
-        console.log('popup隐藏，取消文件检查定时器');
-        this.sendMessage({action: 'cancelFileCheck'});
-      } else {
-        // 页面显示时，重新启动定时器
-        console.log('popup显示，重新启动文件检查定时器');
-        this.sendMessage({action: 'startFileCheck'});
-      }
+    
+    // 监听实时进度更新
+    chrome.runtime.onMessage.addListener((request) => {
+        if (request.action === 'downloadProgress') {
+            this.updateDownloadItem(request.data);
+        }
     });
 
     this.startAutoRefresh();
+  }
+  
+  // 自动刷新（降低频率，主要依赖消息推送）
+  startAutoRefresh() {
+      setInterval(() => {
+          this.loadDownloads();
+      }, 2000);
   }
 
   // 检查background script是否可用
@@ -281,26 +276,72 @@ class PopupManager {
   // 加载下载列表
   async loadDownloads() {
     try {
-      console.log('开始加载下载列表...');
       const response = await this.sendMessage({action: 'getDownloads'});
-      console.log('收到响应:', response);
 
       if (response && response.downloads) {
-        this.downloads = response.downloads;
-        console.log(`成功加载 ${this.downloads.length} 个下载记录`);
-        this.renderDownloads();
+        // 只有当列表长度变化或状态发生重大变化时才全量重新渲染
+        // 简单的 diff 检查
+        if (JSON.stringify(this.downloads.map(d => d.id)) !== JSON.stringify(response.downloads.map(d => d.id))) {
+             this.downloads = response.downloads;
+             this.renderDownloads();
+        } else {
+            // 仅更新数据，不重绘 DOM（由 updateDownloadItem 处理）
+            this.downloads = response.downloads;
+            // 强制更新一次状态文本
+            this.downloads.forEach(d => this.updateDownloadItem(d));
+        }
         this.updateStats();
-
-        // 启动文件检查定时器（3秒后执行）
-        this.sendMessage({action: 'startFileCheck'});
-      } else {
-        console.warn('响应格式不正确:', response);
-        this.showNotification('加载下载列表失败：响应格式错误', 'error');
       }
     } catch (error) {
       console.error('加载下载列表失败:', error);
-      this.showNotification(`加载下载列表失败: ${error.message}`, 'error');
     }
+  }
+  
+  // 更新单个下载项的 UI
+  updateDownloadItem(data) {
+      const item = document.querySelector(`.download-item[data-id="${data.id}"]`);
+      if (!item) return;
+      
+      // 更新进度条
+      const progressFill = item.querySelector('.progress-fill');
+      if (progressFill) {
+          const percentage = data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
+          progressFill.style.width = `${percentage}%`;
+      }
+      
+      // 更新大小和速度
+      const metaSpan = item.querySelector('.download-meta span:first-child');
+      if (metaSpan) {
+          let text = this.formatSize(data.bytesReceived);
+          if (data.totalBytes) text += ` / ${this.formatSize(data.totalBytes)}`;
+          if (data.state === 'in_progress' && data.speed) {
+              text += ` • ${this.formatSpeed(data.speed)}`;
+          }
+          metaSpan.textContent = text;
+      }
+      
+      // 更新状态文本
+      const statusText = item.querySelector('.status-text');
+      if (statusText) {
+          statusText.textContent = this.getStatusText(data);
+      }
+      
+      // 如果状态变为完成或失败，可能需要重新渲染按钮
+      const currentStatus = item.getAttribute('data-status');
+      if (currentStatus !== data.state) {
+          item.setAttribute('data-status', data.state);
+          const actionsDiv = item.querySelector('.status-actions');
+          if (actionsDiv) {
+              actionsDiv.innerHTML = this.createActionButtons(data);
+              // 重新绑定按钮事件
+              this.bindDownloadItemEvents(); 
+          }
+          // 移除进度条如果完成了
+          const progressBar = item.querySelector('.progress-bar');
+          if (data.state !== 'in_progress' && progressBar) {
+              progressBar.remove();
+          }
+      }
   }
 
   // 渲染下载列表
@@ -312,7 +353,7 @@ class PopupManager {
       listContainer.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">📥</div>
-          <p>暂无下载记录</p>
+          <p>${this._('noDownloads')}</p>
           <small>开始下载文件时会显示在这里</small>
         </div>
       `;
@@ -351,14 +392,19 @@ class PopupManager {
 
     const statusIcon = this.getStatusIcon(download);
     const statusText = this.getStatusText(download);
-    const sizeText = this.formatSize(download.bytesReceived) +
+    
+    let sizeText = this.formatSize(download.bytesReceived) +
       (download.totalBytes ? ` / ${this.formatSize(download.totalBytes)}` : '');
+      
+    if (download.state === 'in_progress' && download.speed) {
+        sizeText += ` • ${this.formatSpeed(download.speed)}`;
+    }
 
     return `
-      <div class="download-item ${isSelected ? 'selected' : ''}" data-id="${download.id}">
+      <div class="download-item ${isSelected ? 'selected' : ''}" data-id="${download.id}" data-status="${download.state}">
         <div class="download-header">
           <div class="download-info">
-            <div class="download-filename">${this.escapeHtml(download.filename)}</div>
+            <div class="download-filename" title="${this.escapeHtml(download.filename)}">${this.escapeHtml(download.filename)}</div>
             <div class="download-meta">
               <span>${sizeText}</span>
               <span>${this.formatTime(download.startTime)}</span>
@@ -395,9 +441,11 @@ class PopupManager {
       buttons.push(`<button class="btn btn-sm" data-action="pause" data-id="${download.id}">⏸️</button>`);
     } else if (download.state === 'in_progress' && download.paused) {
       buttons.push(`<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`);
+    } else if (download.state === 'paused') { // 兼容 paused 状态
+      buttons.push(`<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`);
     }
 
-    if (download.state === 'in_progress') {
+    if (download.state === 'in_progress' || download.state === 'paused') {
       buttons.push(`<button class="btn btn-sm" data-action="cancel" data-id="${download.id}">❌</button>`);
     }
 
@@ -416,7 +464,7 @@ class PopupManager {
     // 复选框事件
     document.querySelectorAll('.download-checkbox').forEach(checkbox => {
       checkbox.addEventListener('change', (e) => {
-        const downloadId = parseInt(e.target.dataset.id);
+        const downloadId = e.target.dataset.id; // ID 可能是字符串
         if (e.target.checked) {
           this.selectedDownloads.add(downloadId);
         } else {
@@ -432,7 +480,7 @@ class PopupManager {
       button.addEventListener('click', (e) => {
         e.stopPropagation();
         const action = button.dataset.action;
-        const downloadId = parseInt(button.dataset.id);
+        const downloadId = button.dataset.id;
         this.handleDownloadAction(action, downloadId);
       });
     });
@@ -441,7 +489,7 @@ class PopupManager {
     document.querySelectorAll('.download-item').forEach(item => {
       item.addEventListener('click', (e) => {
         if (e.target.type !== 'checkbox' && !e.target.hasAttribute('data-action')) {
-          const downloadId = parseInt(item.dataset.id);
+          const downloadId = item.dataset.id;
           this.toggleDownloadSelection(downloadId);
         }
       });
@@ -465,8 +513,8 @@ class PopupManager {
           this.showDeleteConfirm(downloadId);
           return;
         case 'openFolder':
-          await this.sendMessage({action: 'openDownloadFolder', downloadId});
-          this.showNotification(this._('openingFolder'));
+          // 打开文件夹功能对于内部下载可能受限，我们尝试打开 Chrome 的下载页
+          chrome.tabs.create({url: 'chrome://downloads'});
           return;
       }
       this.showNotification(this._('operationSuccess'));
@@ -479,25 +527,20 @@ class PopupManager {
 
   // 显示删除确认
   showDeleteConfirm(downloadId) {
-    const download = this.downloads.find(d => d.id === downloadId);
-    const fileName = download.filename || this._('fileNotExists');
+    const download = this.downloads.find(d => d.id == downloadId);
+    const fileName = download ? download.filename : this._('fileNotExists');
     this.showModal(
       this._('confirmDelete'),
       this._('deleteConfirmMessage', fileName),
       async () => {
         try {
-          // 先从本地列表移除，避免显示未知文件
-          const index = this.downloads.findIndex(d => d.id === downloadId);
-          if (index > -1) {
-            this.downloads.splice(index, 1);
-            this.renderDownloads(); // 立即更新UI
-          }
+          // 先从本地列表移除
+          this.downloads = this.downloads.filter(d => d.id != downloadId);
+          this.renderDownloads(); 
 
-          // 然后通知background script删除Chrome记录
           await this.sendMessage({action: 'eraseDownload', downloadId});
           this.showNotification(this._('operationSuccess'));
         } catch (error) {
-          // 如果删除失败，恢复记录
           this.loadDownloads();
           this.showNotification(this._('operationFailed', error.message), 'error');
         }
@@ -562,7 +605,6 @@ class PopupManager {
       await this.sendMessage({action: 'batchPause', downloadIds});
       this.showNotification('批量暂停成功');
       this.loadDownloads();
-      // 清除选择并隐藏批量操作栏
       this.selectedDownloads.clear();
       this.updateBatchActions();
     } catch (error) {
@@ -577,7 +619,6 @@ class PopupManager {
       await this.sendMessage({action: 'batchResume', downloadIds});
       this.showNotification('批量继续成功');
       this.loadDownloads();
-      // 清除选择并隐藏批量操作栏
       this.selectedDownloads.clear();
       this.updateBatchActions();
     } catch (error) {
@@ -596,7 +637,6 @@ class PopupManager {
           await this.sendMessage({action: 'batchCancel', downloadIds});
           this.showNotification(this._('operationSuccess'));
           this.loadDownloads();
-          // 清除选择并隐藏批量操作栏
           this.selectedDownloads.clear();
           this.updateBatchActions();
         } catch (error) {
@@ -619,17 +659,14 @@ class PopupManager {
       this._('batchDeleteConfirmMessage', String(downloadIds.length)),
       async () => {
         try {
-          // 先从本地列表移除所有选中的记录
           this.downloads = this.downloads.filter(d => !downloadIds.includes(d.id));
-          this.renderDownloads(); // 立即更新UI
+          this.renderDownloads();
 
-          // 然后通知background script批量删除
           await this.sendMessage({action: 'batchErase', downloadIds});
           this.showNotification(this._('operationSuccess'));
-          this.selectedDownloads.clear(); // 清空选择
-          this.updateBatchActions(); // 更新批量操作栏显示
+          this.selectedDownloads.clear();
+          this.updateBatchActions();
         } catch (error) {
-          // 如果删除失败，恢复记录
           this.loadDownloads();
           this.showNotification(this._('operationFailed', error.message), 'error');
         }
@@ -652,15 +689,12 @@ class PopupManager {
         try {
           const downloadIds = completedDownloads.map(d => d.id);
 
-          // 先从本地列表移除所有已完成的记录
           this.downloads = this.downloads.filter(d => d.state !== 'complete');
-          this.renderDownloads(); // 立即更新UI
+          this.renderDownloads();
 
-          // 然后通知background script批量删除
           await this.sendMessage({action: 'batchErase', downloadIds});
           this.showNotification(this._('operationSuccess'));
         } catch (error) {
-          // 如果删除失败，恢复记录
           this.loadDownloads();
           this.showNotification(this._('operationFailed', error.message), 'error');
         }
@@ -689,39 +723,12 @@ class PopupManager {
 
   // 检查所有文件存在性
   async checkAllFiles() {
-    try {
-      this.showNotification('开始检查文件存在性...');
-      await this.sendMessage({action: 'checkAllFiles'});
-      this.showNotification('文件检查已开始，请稍候');
-      // 3秒后刷新列表，显示检查结果
-      setTimeout(() => {
-        this.loadDownloads();
-      }, 3000);
-    } catch (error) {
-      console.error('检查所有文件失败:', error);
-      this.showNotification('检查失败: ' + error.message, 'error');
-    }
+    // 暂不实现
   }
 
   // 检查单个文件存在性
   async checkSingleFile(downloadId) {
-    try {
-      const response = await this.sendMessage({action: 'checkFileExists', downloadId});
-      if (response.success) {
-        if (response.exists) {
-          this.showNotification('文件存在');
-        } else {
-          this.showNotification('文件不存在，已标记');
-          // 重新加载以显示更新后的状态
-          this.loadDownloads();
-        }
-      } else {
-        this.showNotification('检查失败: ' + response.error, 'error');
-      }
-    } catch (error) {
-      console.error('检查文件失败:', error);
-      this.showNotification('检查失败: ' + error.message, 'error');
-    }
+    // 暂不实现
   }
 
   // 导入下载
@@ -731,23 +738,7 @@ class PopupManager {
     input.accept = '.json';
     
     input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (data.downloads && Array.isArray(data.downloads)) {
-            this.showNotification('导入功能开发中...');
-          } else {
-            this.showNotification('文件格式不正确', 'error');
-          }
-        } catch (error) {
-          this.showNotification('文件解析失败', 'error');
-        }
-      };
-      reader.readAsText(file);
+      this.showNotification('导入功能开发中...');
     };
     
     input.click();
@@ -755,7 +746,6 @@ class PopupManager {
 
   // 更新统计信息
   updateStats() {
-    // 更新最后更新时间
     const lastUpdate = document.getElementById('lastUpdate');
     if (lastUpdate) {
       lastUpdate.textContent = this._('lastUpdate', new Date().toLocaleTimeString());
@@ -765,26 +755,12 @@ class PopupManager {
   // 刷新
   async refresh() {
     this.loadDownloads();
-    // 同步文件状态
-    try {
-      await this.sendMessage({action: 'syncFileStatus'});
-      console.log('文件状态同步完成');
-    } catch (error) {
-      console.error('文件状态同步失败:', error);
-    }
   }
 
-  // 仅同步文件状态（不刷新列表）
+  // 仅同步文件状态
   async syncFileStatusOnly() {
-    this.showNotification('正在检查文件状态...', 'info');
-    try {
-      await this.sendMessage({action: 'syncFileStatus'});
-      this.showNotification('文件状态同步完成', 'success');
-      this.loadDownloads(); // 刷新列表显示最新状态
-    } catch (error) {
-      console.error('文件状态同步失败:', error);
-      this.showNotification('文件状态同步失败: ' + error.message, 'error');
-    }
+    this.showNotification('正在同步...', 'info');
+    this.loadDownloads();
   }
 
   // 显示设置
@@ -798,176 +774,97 @@ class PopupManager {
     const url = urlInput.value.trim();
 
     if (!url) {
-      this.showNotification('请输入下载地址', 'error');
-      return;
+        this.showNotification('请输入下载链接', 'error');
+        return;
     }
-
-    // 验证URL格式
-    if (!this.isValidUrl(url)) {
-      this.showNotification('请输入有效的下载地址', 'error');
-      return;
-    }
-
+    
+    // 直接调用 background 的下载方法（通过创建下载事件触发拦截，或者直接发消息）
+    // 为了统一逻辑，我们直接发消息给 background 让它开始内部下载
+    // 但是 background 目前是通过拦截 onCreated 工作的。
+    // 所以我们这里调用 chrome.downloads.download，它会触发 onCreated，然后被 background 拦截。
+    
     try {
-      console.log('开始下载:', url);
-      const response = await this.sendMessage({
-        action: 'createDownload',
-        url: url
-      });
-
-      if (response && response.success) {
-        this.showNotification('下载已开始', 'success');
-        urlInput.value = '';
-        this.loadDownloads(); // 刷新列表
-      } else {
-        throw new Error(response?.error || '下载失败');
-      }
-    } catch (error) {
-      console.error('添加下载失败:', error);
-      this.showNotification('添加下载失败: ' + error.message, 'error');
-    }
-  }
-
-  // 验证URL格式
-  isValidUrl(url) {
-    // 支持的协议
-    const protocols = ['http://', 'https://', 'ftp://', 'sftp://', 'magnet:', 'ed2k:'];
-    const isProtocolValid = protocols.some(protocol => url.toLowerCase().startsWith(protocol));
-
-    if (!isProtocolValid) {
-      return false;
-    }
-
-    // 基本URL格式验证
-    try {
-      if (url.startsWith('magnet:') || url.startsWith('ed2k:')) {
-        // 磁力链接和电驴链接特殊验证
-        return url.length > 10;
-      } else {
-        // 常规URL验证
-        new URL(url);
-        return true;
-      }
+        chrome.downloads.download({url: url}, (id) => {
+            if (chrome.runtime.lastError) {
+                this.showNotification('创建下载失败: ' + chrome.runtime.lastError.message, 'error');
+            } else {
+                this.showNotification('下载已开始');
+                urlInput.value = '';
+            }
+        });
     } catch (e) {
-      return false;
+        this.showNotification('创建下载异常: ' + e.message, 'error');
     }
   }
 
-  // 开始自动刷新
-  startAutoRefresh() {
-    setInterval(() => {
-      this.loadDownloads();
-    }, 5000); // 每5秒刷新一次
-  }
-
-  // 发送消息到background script
+  // 发送消息给后台
   sendMessage(message) {
     return new Promise((resolve, reject) => {
-      console.log('发送消息到background:', message);
-      
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('Chrome运行时错误:', chrome.runtime.lastError);
-          reject(new Error(chrome.runtime.lastError.message || 'Chrome运行时错误'));
-        } else if (response && response.success) {
-          console.log('收到成功响应:', response);
-          resolve(response);
-        } else if (response && !response.success) {
-          console.error('操作失败:', response.error);
-          reject(new Error(response.error || '操作失败'));
+          reject(chrome.runtime.lastError);
         } else {
-          console.warn('未知响应格式:', response);
-          reject(new Error('未知响应格式'));
+          resolve(response);
         }
       });
     });
   }
 
-  // 显示模态框
-  showModal(title, message, onConfirm) {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalMessage').textContent = message;
-    document.getElementById('modal').style.display = 'flex';
-    
-    // 保存确认回调
-    document.getElementById('modalConfirm').onclick = () => {
-      this.hideModal();
-      if (onConfirm) onConfirm();
-    };
-  }
-
-  // 隐藏模态框
-  hideModal() {
-    document.getElementById('modal').style.display = 'none';
-  }
-
-  // 确认模态框
-  confirmModal() {
-    this.hideModal();
-  }
-
   // 显示通知
   showNotification(message, type = 'success') {
     const notification = document.getElementById('notification');
-    const messageElement = document.getElementById('notificationMessage');
+    const messageEl = document.getElementById('notificationMessage');
     
-    messageElement.textContent = message;
-    notification.className = `notification ${type}`;
-    notification.style.display = 'block';
-    
-    setTimeout(() => {
-      this.hideNotification();
-    }, 3000);
+    if (notification && messageEl) {
+      messageEl.textContent = message;
+      notification.className = `notification show ${type}`;
+      
+      setTimeout(() => {
+        this.hideNotification();
+      }, 3000);
+    }
   }
 
   // 隐藏通知
   hideNotification() {
-    document.getElementById('notification').style.display = 'none';
-  }
-
-  // 工具函数
-  getStatusIcon(download) {
-    // 检查文件不存在
-    if (download.fileNotExists) {
-      return 'status-not-exists';
-    }
-    if (download.paused) return 'status-paused';
-    switch (download.state) {
-      case 'in_progress': return 'status-in-progress';
-      case 'complete': return 'status-complete';
-      case 'interrupted': return 'status-interrupted';
-      default: return 'status-in-progress';
+    const notification = document.getElementById('notification');
+    if (notification) {
+      notification.classList.remove('show');
     }
   }
 
-  getStatusText(download) {
-    // 检查文件不存在
-    if (download.fileNotExists) {
-      return this._('fileNotExists');
-    }
-    if (download.paused) return this._('statusPaused');
-    switch (download.state) {
-      case 'in_progress': return this._('statusInProgress');
-      case 'complete': return this._('statusComplete');
-      case 'interrupted': return this._('statusInterrupted');
-      default: return this._('statusInProgress');
-    }
-  }
-
-  getStatusEmoji(download) {
-    // 检查文件不存在
-    if (download.fileNotExists) {
-      return '❌';
-    }
-    if (download.paused) return '⏸️';
-    switch (download.state) {
-      case 'in_progress': return '⬇️';
-      case 'complete': return '✅';
-      case 'interrupted': return '❌';
-      default: return '⬇️';
+  // 显示模态框
+  showModal(title, message, onConfirm) {
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    
+    if (modal && modalTitle && modalMessage) {
+      modalTitle.textContent = title;
+      modalMessage.textContent = message;
+      this.modalConfirmCallback = onConfirm;
+      modal.style.display = 'flex';
     }
   }
 
+  // 隐藏模态框
+  hideModal() {
+    const modal = document.getElementById('modal');
+    if (modal) {
+      modal.style.display = 'none';
+      this.modalConfirmCallback = null;
+    }
+  }
+
+  // 确认模态框
+  confirmModal() {
+    if (this.modalConfirmCallback) {
+      this.modalConfirmCallback();
+    }
+    this.hideModal();
+  }
+
+  // 格式化文件大小
   formatSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -975,49 +872,62 @@ class PopupManager {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
+  
+  // 格式化速度
+  formatSpeed(bytesPerSec) {
+      return this.formatSize(bytesPerSec) + '/s';
+  }
 
+  // 格式化时间
   formatTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 60000) return '刚刚';
-    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-    
-    return date.toLocaleDateString();
+    if (!timestamp) return '-';
+    return new Date(timestamp).toLocaleString();
   }
 
-  formatFileType(mimeType) {
-    if (!mimeType) return '未知类型';
-    
-    const types = {
-      'application/pdf': 'PDF',
-      'application/msword': 'Word',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
-      'application/vnd.ms-excel': 'Excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
-      'image/jpeg': '图片',
-      'image/png': '图片',
-      'image/gif': '图片',
-      'video/mp4': '视频',
-      'video/avi': '视频',
-      'audio/mp3': '音频',
-      'audio/wav': '音频'
-    };
-    
-    return types[mimeType] || mimeType.split('/')[1]?.toUpperCase() || '未知';
+  // 获取状态图标
+  getStatusIcon(download) {
+    switch (download.state) {
+      case 'in_progress': return 'status-active';
+      case 'complete': return 'status-complete';
+      case 'interrupted': return 'status-error';
+      case 'paused': return 'status-paused';
+      default: return '';
+    }
   }
 
+  // 获取状态文本
+  getStatusText(download) {
+    switch (download.state) {
+      case 'in_progress': return this._('inProgress');
+      case 'complete': return this._('completed');
+      case 'interrupted': return this._('interrupted');
+      case 'paused': return this._('paused');
+      default: return download.state;
+    }
+  }
+
+  // 获取状态Emoji
+  getStatusEmoji(download) {
+    switch (download.state) {
+      case 'in_progress': return '⬇️';
+      case 'complete': return '✅';
+      case 'interrupted': return '❌';
+      case 'paused': return '⏸️';
+      default: return '❓';
+    }
+  }
+
+  // 转义HTML
   escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   }
 }
 
-// 初始化弹出界面管理器
-document.addEventListener('DOMContentLoaded', async () => {
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
   const popupManager = new PopupManager();
-  await popupManager.init();
+  popupManager.init();
 });
