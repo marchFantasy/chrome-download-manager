@@ -540,13 +540,17 @@ class PopupManager {
         case 'resume':
           await this.sendMessage({action: 'resumeDownload', downloadId});
           break;
-        case 'cancel':
-          await this.sendMessage({action: 'cancelDownload', downloadId});
+        case 'cancel': {
+          const response = await this.sendMessage({action: 'cancelDownload', downloadId});
+          if (response && response.success) {
+            this.showNotification(this._('operationSuccess'));
+            this.loadDownloads();
+          } else {
+            this.showNotification(response?.error || this._('operationFailed'), 'error');
+          }
           break;
-        case 'delete':
-          this.showDeleteConfirm(downloadId);
-          return;
-        case 'openFolder':
+        }
+        case 'openFolder': {
           // 打开文件所在的文件夹
           const download = this.downloads.find(d => d.id == downloadId);
           if (download && download.finalDownloadId) {
@@ -556,9 +560,11 @@ class PopupManager {
             this.showNotification('无法打开文件夹：文件未保存或已被删除', 'error');
           }
           return;
+        }
+        case 'delete':
+          this.showDeleteConfirm(downloadId);
+          return;
       }
-      this.showNotification(this._('operationSuccess'));
-      this.loadDownloads();
     } catch (error) {
       console.error('操作失败:', error);
       this.showNotification(this._('operationFailed', error.message), 'error');

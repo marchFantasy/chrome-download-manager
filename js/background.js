@@ -2,7 +2,7 @@
 // 处理下载事件和管理下载状态
 
 // 引入核心下载器
-// eslint-disable-next-line no-undef
+ 
 importScripts('/js/core/downloader.js');
 
 /* global Downloader */
