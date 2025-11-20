@@ -11,6 +11,7 @@ class DownloadManager {
     this.animationInterval = null;
     this.fileCheckTimer = null; // 文件检查定时器
     this.internalDownloadIds = new Set(); // 追踪由本扩展发起的下载ID（用于最终保存文件）
+    this.largeFileUrls = new Set(); // 追踪大文件的 URL，避免重复拦截
     this.init();
   }
 
@@ -286,51 +287,91 @@ class DownloadManager {
           // this.saveDownloadInfo(downloadInfo); 
           
           // 发送进度更新给 popup (如果打开)
+          // 注意：只发送必要的数据，不包含 downloader 实例和大数据对象
           chrome.runtime.sendMessage({
               action: 'downloadProgress',
-              data: downloadInfo
+              data: {
+                  id: downloadInfo.id,
+                  filename: downloadInfo.filename,
+                  url: downloadInfo.url,
+                  state: downloadInfo.state,
+                  bytesReceived: downloadInfo.bytesReceived,
+                  totalBytes: downloadInfo.totalBytes,
+                  speed: downloadInfo.speed,
+                  startTime: downloadInfo.startTime
+              }
           }).catch(() => {});
       };
 
       downloader.onComplete = async (data) => {
-          downloadInfo.state = 'complete';
           downloadInfo.endTime = Date.now();
-          downloadInfo.blob = data.blob; // 暂存 Blob
+          const fileSize = data.blob.size;
           
-          console.log(`内部下载完成: ${filename}, 开始保存到磁盘...`);
+          console.log(`内部下载完成: ${filename}, 大小: ${fileSize} 字节`);
           
-          // 保存文件到磁盘
-          // 注意: Service Worker 不支持 URL.createObjectURL
-          // 我们需要使用 FileReader 将 Blob 转换为 Data URL
+          // 对于大文件（> 50MB），Data URL 方案性能太差
+          // 改为直接使用原始 URL 让 Chrome 下载
+          const SIZE_LIMIT = 50 * 1024 * 1024; // 50MB
+          
+          if (fileSize > SIZE_LIMIT) {
+              console.log(`文件过大 (${(fileSize / 1024 / 1024).toFixed(2)} MB)，使用原生下载`);
+              
+              // 先添加到 largeFileUrls，防止被拦截
+              this.largeFileUrls.add(downloadInfo.url);
+              
+              // 直接使用原始 URL 创建下载，不拦截
+              chrome.downloads.download({
+                  url: downloadInfo.url,
+                  filename: filename,
+                  saveAs: false
+              }, (downloadId) => {
+                  if (chrome.runtime.lastError) {
+                      console.error('创建原生下载失败:', chrome.runtime.lastError);
+                      downloadInfo.error = chrome.runtime.lastError.message;
+                      downloadInfo.state = 'interrupted';
+                      this.saveDownloadInfo(downloadInfo);
+                      this.showNotification('下载失败', `❌ ${filename}`);
+                      // 失败时移除 URL
+                      this.largeFileUrls.delete(downloadInfo.url);
+                  } else {
+                      console.log(`已创建原生下载任务，Chrome ID: ${downloadId}`);
+                      this.internalDownloadIds.add(downloadId);
+                      downloadInfo.finalDownloadId = downloadId;
+                      downloadInfo.state = 'saving';
+                      this.saveDownloadInfo(downloadInfo);
+                      // 完成通知由 onDownloadChanged 处理
+                  }
+              });
+              return;
+          }
+          
+          // 小文件使用 Data URL 方案
+          console.log(`文件较小，使用 Data URL 保存`);
+          
           try {
               const reader = new FileReader();
               
               reader.onload = () => {
                   const dataUrl = reader.result;
                   
-                  // 使用 Data URL 创建下载
-                  // 注意：必须先添加到 internalDownloadIds，然后再调用 download
-                  // 否则会在 onCreated 中被拦截
-                  const tempId = 'pending_' + Date.now();
-                  
                   chrome.downloads.download({
                       url: dataUrl,
                       filename: filename,
-                      saveAs: false // 自动保存，不弹窗
+                      saveAs: false
                   }, (downloadId) => {
                       if (chrome.runtime.lastError) {
                           console.error('保存文件失败:', chrome.runtime.lastError);
                           downloadInfo.error = chrome.runtime.lastError.message;
                           downloadInfo.state = 'interrupted';
+                          this.saveDownloadInfo(downloadInfo);
+                          this.showNotification('保存失败', `❌ ${filename}`);
                       } else {
                           console.log(`文件保存任务已创建，Chrome ID: ${downloadId}`);
-                          // 立即标记为内部下载，防止被拦截
                           this.internalDownloadIds.add(downloadId);
-                          downloadInfo.finalDownloadId = downloadId; // 关联 Chrome ID
+                          downloadInfo.finalDownloadId = downloadId;
+                          downloadInfo.state = 'saving';
+                          this.saveDownloadInfo(downloadInfo);
                       }
-                      this.saveDownloadInfo(downloadInfo);
-                      this.showNotification('下载完成', `✅ ${filename}`);
-                      this.flashBadgeForCompletion();
                   });
               };
               
@@ -339,15 +380,16 @@ class DownloadManager {
                   downloadInfo.error = 'Blob 转换失败';
                   downloadInfo.state = 'interrupted';
                   this.saveDownloadInfo(downloadInfo);
+                  this.showNotification('转换失败', `❌ ${filename}`);
               };
               
-              // 开始转换
               reader.readAsDataURL(data.blob);
           } catch (e) {
               console.error('保存流程异常:', e);
               downloadInfo.error = e.message;
               downloadInfo.state = 'interrupted';
               this.saveDownloadInfo(downloadInfo);
+              this.showNotification('保存异常', `❌ ${filename}`);
           }
       };
 
@@ -383,7 +425,15 @@ class DownloadManager {
         return;
     }
 
-    // 3. 拦截普通下载
+    // 3. 检查是否是大文件重新下载（避免重复拦截）
+    if (this.largeFileUrls.has(downloadItem.url)) {
+        console.log('检测到大文件重新下载任务，放行:', downloadItem.url);
+        // 下载开始后可以从 Set 中移除
+        this.largeFileUrls.delete(downloadItem.url);
+        return;
+    }
+
+    // 4. 拦截普通下载
     console.log('拦截到外部下载，准备接管:', downloadItem.url);
     
     // 取消原生下载
@@ -410,11 +460,22 @@ class DownloadManager {
     // 查找关联的内部下载
     for (const [id, info] of this.downloads.entries()) {
         if (info.finalDownloadId === downloadDelta.id) {
-            if (downloadDelta.state && downloadDelta.state.newValue === 'interrupted') {
-                console.warn('最终保存任务被中断');
-                info.state = 'interrupted';
-                info.error = '文件保存被中断';
-                this.saveDownloadInfo(info);
+            // 检查最终保存任务的状态变化
+            if (downloadDelta.state) {
+                if (downloadDelta.state.current === 'complete') {
+                    // 文件真正保存完成
+                    console.log(`文件保存完成: ${info.filename}`);
+                    info.state = 'complete';
+                    this.saveDownloadInfo(info);
+                    this.showNotification('下载完成', `✅ ${info.filename}`);
+                    this.flashBadgeForCompletion();
+                } else if (downloadDelta.state.current === 'interrupted') {
+                    console.warn('最终保存任务被中断');
+                    info.state = 'interrupted';
+                    info.error = '文件保存被中断';
+                    this.saveDownloadInfo(info);
+                    this.showNotification('保存中断', `❌ ${info.filename}`);
+                }
             }
         }
     }

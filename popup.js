@@ -336,10 +336,26 @@ class PopupManager {
               // 重新绑定按钮事件
               this.bindDownloadItemEvents(); 
           }
-          // 移除进度条如果完成了
+          
+          // 处理进度条的显示/隐藏
           const progressBar = item.querySelector('.progress-bar');
-          if (data.state !== 'in_progress' && progressBar) {
-              progressBar.remove();
+          
+          if (data.state === 'in_progress') {
+              // 如果恢复下载，需要重新添加进度条
+              if (!progressBar) {
+                  const percentage = data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
+                  const progressHtml = `
+                      <div class="progress-bar">
+                          <div class="progress-fill" style="width: ${percentage}%"></div>
+                      </div>
+                  `;
+                  item.insertAdjacentHTML('beforeend', progressHtml);
+              }
+          } else {
+              // 如果下载完成或中断，移除进度条
+              if (progressBar) {
+                  progressBar.remove();
+              }
           }
       }
   }
@@ -513,8 +529,14 @@ class PopupManager {
           this.showDeleteConfirm(downloadId);
           return;
         case 'openFolder':
-          // 打开文件夹功能对于内部下载可能受限，我们尝试打开 Chrome 的下载页
-          chrome.tabs.create({url: 'chrome://downloads'});
+          // 打开文件所在的文件夹
+          const download = this.downloads.find(d => d.id == downloadId);
+          if (download && download.finalDownloadId) {
+            // 使用 Chrome API 在文件管理器中显示文件
+            chrome.downloads.show(download.finalDownloadId);
+          } else {
+            this.showNotification('无法打开文件夹：文件未保存或已被删除', 'error');
+          }
           return;
       }
       this.showNotification(this._('operationSuccess'));

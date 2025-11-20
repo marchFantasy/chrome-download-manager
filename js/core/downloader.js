@@ -1,6 +1,6 @@
 /**
  * 核心下载器类
- * 负责分块下载、速度计算和文件合并
+ * 负责分块下载、速度计算、文件合并和断点续传
  */
 class Downloader {
     constructor(url, filename, options = {}) {
@@ -18,10 +18,12 @@ class Downloader {
         this.startTime = Date.now();
         this.endTime = null;
         this.speed = 0; // bytes per second
-        this.chunks = [];
-        this.abortController = new AbortController();
+        this.chunks = []; // 存储已下载的分块 Blob
+        this.chunkProgress = []; // 记录每个分块的下载进度 {start, end, downloaded}
+        this.abortControllers = []; // 每个分块一个 AbortController
         this.lastSpeedUpdate = Date.now();
         this.lastBytesReceived = 0;
+        this.supportsRange = false; // 是否支持 Range 请求
         
         // 事件回调
         this.onProgress = null;
@@ -40,11 +42,13 @@ class Downloader {
             
             this.totalBytes = parseInt(headResponse.headers.get('content-length') || '0');
             const acceptRanges = headResponse.headers.get('accept-ranges');
+            this.supportsRange = acceptRanges === 'bytes';
             
-            console.log(`开始下载: ${this.filename}, 大小: ${this.totalBytes}, 支持分块: ${acceptRanges === 'bytes'}`);
+            console.log(`开始下载: ${this.filename}, 大小: ${this.totalBytes}, 支持分块: ${this.supportsRange}`);
 
-            if (this.totalBytes > 0 && acceptRanges === 'bytes') {
+            if (this.totalBytes > 0 && this.supportsRange) {
                 // 支持分块下载
+                this.initChunkProgress();
                 await this.downloadChunks();
             } else {
                 // 不支持分块或大小未知，单线程下载
@@ -55,78 +59,155 @@ class Downloader {
         }
     }
 
-    // 分块下载
-    async downloadChunks() {
+    // 初始化分块进度
+    initChunkProgress() {
+        if (this.chunkProgress.length > 0) return; // 已初始化，跳过
+        
         const chunkSize = Math.ceil(this.totalBytes / this.options.chunks);
-        const promises = [];
-
+        
         for (let i = 0; i < this.options.chunks; i++) {
             const start = i * chunkSize;
             const end = i === this.options.chunks - 1 ? this.totalBytes - 1 : (i + 1) * chunkSize - 1;
             
-            promises.push(this.downloadChunk(i, start, end));
+            this.chunkProgress.push({
+                index: i,
+                start: start,
+                end: end,
+                downloaded: 0, // 已下载字节数
+                completed: false,
+                data: [] // 存储已下载的数据块
+            });
+            
+            this.abortControllers.push(new AbortController());
+        }
+    }
+
+    // 分块下载
+    async downloadChunks() {
+        const promises = [];
+
+        for (let i = 0; i < this.options.chunks; i++) {
+            promises.push(this.downloadChunk(i));
         }
 
         try {
-            await Promise.all(promises);
-            this.finish();
+            // 使用 allSettled 而不是 all，这样单个分块失败不会中断其他分块
+            const results = await Promise.allSettled(promises);
+            
+            // 如果已经暂停，不要标记为完成
+            if (this.state === 'paused') {
+                console.log('下载已暂停，等待恢复');
+                return;
+            }
+            
+            // 检查是否有失败的分块
+            const failures = results.filter(r => r.status === 'rejected');
+            
+            if (failures.length > 0) {
+                console.error(`${failures.length} 个分块下载失败`);
+                throw new Error(`${failures.length} 个分块下载失败: ${failures[0].reason}`);
+            }
+            
+            // 检查是否所有分块都真正完成了
+            const allCompleted = this.chunkProgress.every(chunk => chunk.completed);
+            if (allCompleted) {
+                this.finish();
+            } else {
+                console.warn('部分分块未完成，下载未完成');
+            }
         } catch (error) {
             this.handleError(error);
         }
     }
 
-    // 下载单个分块
-    async downloadChunk(index, start, end) {
-        if (this.state !== 'in_progress') return;
-
-        const headers = { 'Range': `bytes=${start}-${end}` };
-        const response = await fetch(this.url, { 
-            headers, 
-            signal: this.abortController.signal 
-        });
-
-        if (!response.ok) throw new Error(`Chunk ${index} failed: ${response.status}`);
-
-        const reader = response.body.getReader();
-        const chunks = [];
+    // 下载单个分块（支持断点续传）
+    async downloadChunk(index) {
+        const chunkInfo = this.chunkProgress[index];
         
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            if (this.state === 'paused') {
-                // 简单的暂停逻辑：中止当前请求，记录进度（实际生产环境需要更复杂的断点记录）
-                // 这里简化为：暂停即中断，恢复需重试（或后续优化为真正的断点续传）
-                // 为了演示快速下载，暂不实现复杂的持久化断点续传
-                throw new Error('Paused');
-            }
-
-            chunks.push(value);
-            this.updateProgress(value.length);
+        if (chunkInfo.completed) {
+            console.log(`分块 ${index} 已完成，跳过`);
+            return;
         }
 
-        // 合并该分块的数据
-        this.chunks[index] = new Blob(chunks);
+        // 计算当前分块的实际起始位置（考虑已下载的部分）
+        const currentStart = chunkInfo.start + chunkInfo.downloaded;
+        const currentEnd = chunkInfo.end;
+        
+        if (currentStart > currentEnd) {
+            chunkInfo.completed = true;
+            return;
+        }
+
+        console.log(`下载分块 ${index}: ${currentStart}-${currentEnd}`);
+
+        try {
+            const headers = { 'Range': `bytes=${currentStart}-${currentEnd}` };
+            const response = await fetch(this.url, { 
+                headers, 
+                signal: this.abortControllers[index].signal 
+            });
+
+            if (!response.ok && response.status !== 206) {
+                throw new Error(`Chunk ${index} failed: ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // 保存数据块
+                chunkInfo.data.push(value);
+                chunkInfo.downloaded += value.length;
+                this.updateProgress(value.length);
+            }
+
+            // 标记分块完成
+            chunkInfo.completed = true;
+            this.chunks[index] = new Blob(chunkInfo.data);
+            console.log(`分块 ${index} 下载完成`);
+            
+        } catch (error) {
+            // 如果是 AbortError 且状态为 paused，不抛出错误
+            if (error.name === 'AbortError' && this.state === 'paused') {
+                console.log(`分块 ${index} 已暂停，已下载: ${chunkInfo.downloaded} 字节`);
+                return;
+            }
+            console.error(`分块 ${index} 下载失败:`, error.message);
+            throw error;
+        }
     }
 
     // 单线程下载（不支持 Range 或大小未知）
     async downloadSingle() {
-        const response = await fetch(this.url, { signal: this.abortController.signal });
-        if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+        const abortController = new AbortController();
+        this.abortControllers = [abortController];
+        
+        try {
+            const response = await fetch(this.url, { signal: abortController.signal });
+            if (!response.ok) throw new Error(`Download failed: ${response.status}`);
 
-        const reader = response.body.getReader();
-        const chunks = [];
+            const reader = response.body.getReader();
+            const chunks = [];
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            chunks.push(value);
-            this.updateProgress(value.length);
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                chunks.push(value);
+                this.updateProgress(value.length);
+            }
+
+            this.chunks = [new Blob(chunks)];
+            this.finish();
+        } catch (error) {
+            if (error.name === 'AbortError' && this.state === 'paused') {
+                console.log('单线程下载已暂停');
+                return;
+            }
+            throw error;
         }
-
-        this.chunks = [new Blob(chunks)];
-        this.finish();
     }
 
     // 更新进度和速度
@@ -178,7 +259,11 @@ class Downloader {
 
     // 处理错误
     handleError(error) {
-        if (error.message === 'Paused') return; // 暂停不是错误
+        // 暂停不是错误，直接返回
+        if (error.name === 'AbortError' && this.state === 'paused') {
+            console.log('下载已暂停');
+            return;
+        }
         
         console.error(`下载错误: ${error.message}`);
         this.state = 'interrupted';
@@ -195,34 +280,56 @@ class Downloader {
     // 暂停
     pause() {
         if (this.state === 'in_progress') {
+            console.log('暂停下载:', this.filename);
             this.state = 'paused';
-            this.abortController.abort();
-            // 重置控制器以便恢复（实际恢复需要记录Range）
-            this.abortController = new AbortController();
+            
+            // 中止所有分块的下载
+            this.abortControllers.forEach(controller => {
+                try {
+                    controller.abort();
+                } catch (e) {
+                    // 忽略已经中止的错误
+                }
+            });
+            
+            // 重置 AbortControllers 以便恢复
+            this.abortControllers = this.abortControllers.map(() => new AbortController());
         }
     }
 
-    // 恢复
+    // 恢复（真正的断点续传）
     resume() {
         if (this.state === 'paused') {
+            console.log('恢复下载:', this.filename, '已下载:', this.bytesReceived, '/', this.totalBytes);
             this.state = 'in_progress';
-            // 简单实现：重新开始（为了演示，实际应实现断点续传）
-            this.bytesReceived = 0;
-            this.chunks = [];
-            this.start();
+            
+            if (this.supportsRange && this.chunkProgress.length > 0) {
+                // 支持断点续传，从中断处继续
+                this.downloadChunks();
+            } else {
+                // 不支持断点续传，只能重新开始
+                console.warn('服务器不支持断点续传，将重新开始下载');
+                this.bytesReceived = 0;
+                this.chunks = [];
+                this.start();
+            }
         }
     }
 
     // 取消
     cancel() {
         this.state = 'interrupted';
-        this.abortController.abort();
+        this.abortControllers.forEach(controller => {
+            try {
+                controller.abort();
+            } catch (e) {
+                // 忽略
+            }
+        });
     }
 }
 
 // 导出给 background.js 使用
-// 在 Service Worker 环境中，直接挂载到全局或使用 ES Module (如果 manifest 配置了 module)
-// 这里假设 background.js 会通过 importScripts 引入，或者我们将其内容合并
 if (typeof self !== 'undefined') {
     self.Downloader = Downloader;
 }
