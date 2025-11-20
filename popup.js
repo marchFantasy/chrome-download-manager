@@ -11,6 +11,7 @@ class PopupManager {
     this.messages = {}; // 存储所有语言包数据
     this.translations = {}; // 当前语言翻译
     this.isLoading = true; // 添加加载状态标志
+    this.notificationTimer = null; // 通知定时器
   }
 
   // 加载所有语言包数据
@@ -226,10 +227,8 @@ class PopupManager {
       this.switchLanguage(e.target.value);
     });
 
-    // 头部按钮
-    document.getElementById('refreshBtn').addEventListener('click', () => this.refresh());
-    document.getElementById('syncFileStatusBtn').addEventListener('click', () => this.syncFileStatusOnly());
-    document.getElementById('settingsBtn').addEventListener('click', () => this.showSettings());
+    // 设置按钮
+    document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
 
     // 新增下载
     document.getElementById('addDownloadBtn').addEventListener('click', () => this.addDownload());
@@ -803,15 +802,10 @@ class PopupManager {
     this.loadDownloads();
   }
 
-  // 仅同步文件状态
-  async syncFileStatusOnly() {
-    this.showNotification('正在同步...', 'info');
-    this.loadDownloads();
-  }
-
-  // 显示设置
-  showSettings() {
-    this.showNotification('设置功能开发中...');
+  // 打开设置页面
+  openSettings() {
+    // TODO: 实现设置页面
+    this.showNotification('设置功能即将推出', 'info');
   }
 
   // 新增下载
@@ -864,8 +858,14 @@ class PopupManager {
     if (notification && messageEl) {
       messageEl.textContent = message;
       notification.className = `notification show ${type}`;
+      notification.style.display = 'block';
       
-      setTimeout(() => {
+      // 清除之前的定时器
+      if (this.notificationTimer) {
+        clearTimeout(this.notificationTimer);
+      }
+
+      this.notificationTimer = setTimeout(() => {
         this.hideNotification();
       }, 3000);
     }
@@ -876,6 +876,7 @@ class PopupManager {
     const notification = document.getElementById('notification');
     if (notification) {
       notification.classList.remove('show');
+      notification.style.display = 'none';
     }
   }
 
