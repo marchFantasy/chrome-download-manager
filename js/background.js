@@ -12,10 +12,11 @@ class DownloadManager {
     this.fileCheckTimer = null; // 文件检查定时器
     this.internalDownloadIds = new Set(); // 追踪由本扩展发起的下载ID（用于最终保存文件）
     this.largeFileUrls = new Set(); // 追踪大文件的 URL，避免重复拦截
+    this.isReady = false; // 标记初始化是否完成
     this.init();
   }
 
-  init() {
+  async init() {
     console.log('DownloadManager 初始化开始...');
 
     // 检查权限
@@ -25,26 +26,27 @@ class DownloadManager {
     }
 
     try {
-      // 监听下载事件
+      // 注册事件监听器
       chrome.downloads.onCreated.addListener(this.onDownloadCreated.bind(this));
       chrome.downloads.onChanged.addListener(this.onDownloadChanged.bind(this));
       chrome.downloads.onErased.addListener(this.onDownloadErased.bind(this));
-
       console.log('下载事件监听器已注册');
 
-      // 禁用Chrome默认下载栏
+      // 禁用默认下载栏
       this.disableDownloadShelf();
 
-      // 初始化badge
+      // 更新徽章
       this.updateBadge();
-      this.updateBadgeColor('#4CAF50'); // 默认绿色
+      this.updateBadgeColor('#4CAF50');
 
-      // 加载已存在的下载
-      this.loadExistingDownloads();
+      // 等待加载已存在的下载（重要：必须等待完成）
+      await this.loadExistingDownloads();
 
+      this.isReady = true; // 标记初始化完成
       console.log('DownloadManager 初始化完成');
     } catch (error) {
       console.error('DownloadManager 初始化失败:', error);
+      this.isReady = true; // 即使失败也标记为完成，避免阻塞
     }
   }
 
@@ -553,6 +555,7 @@ class DownloadManager {
       return timeA - timeB;
     });
 
+    console.log(`getAllDownloads: 返回 ${downloads.length} 个下载记录`);
     return downloads;
   }
 
@@ -617,10 +620,16 @@ class DownloadManager {
 
   // 保存下载信息到存储
   saveDownloadInfo(downloadInfo) {
-    // 移除不应序列化的字段
-    const { downloader, blob, ...dataToSave } = downloadInfo;
-    chrome.storage.local.set({
-      [`download_${downloadInfo.id}`]: dataToSave
+    // 移除不能序列化的对象
+    const { downloader, blob, dataUrl, ...serializableInfo } = downloadInfo;
+    
+    const key = `download_${downloadInfo.id}`;
+    chrome.storage.local.set({ [key]: serializableInfo }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(`保存下载信息失败 (ID: ${downloadInfo.id}):`, chrome.runtime.lastError);
+      } else {
+        console.log(`下载信息已保存到存储 (ID: ${downloadInfo.id}, 状态: ${serializableInfo.state})`);
+      }
     });
   }
 
@@ -632,26 +641,30 @@ class DownloadManager {
   // 加载已存在的下载
   loadExistingDownloads() {
     console.log('开始加载已存在的下载...');
-    chrome.storage.local.get(null, (items) => {
-      if (chrome.runtime.lastError) {
-        console.error('加载存储数据失败:', chrome.runtime.lastError);
-        return;
-      }
-
-      let count = 0;
-      for (const [key, value] of Object.entries(items)) {
-        if (key.startsWith('download_') && value) {
-          // 恢复时，所有未完成的任务标记为中断（因为没有实现持久化断点续传）
-          if (value.state === 'in_progress' || value.state === 'paused') {
-              value.state = 'interrupted';
-              value.error = '会话已过期';
-          }
-          
-          this.downloads.set(value.id, value);
-          count++;
+    return new Promise((resolve) => {
+      chrome.storage.local.get(null, (items) => {
+        if (chrome.runtime.lastError) {
+          console.error('加载存储数据失败:', chrome.runtime.lastError);
+          resolve(); // 即使失败也要 resolve，不阻塞初始化
+          return;
         }
-      }
-      console.log(`已加载 ${count} 个下载记录`);
+
+        let count = 0;
+        for (const [key, value] of Object.entries(items)) {
+          if (key.startsWith('download_') && value) {
+            // 恢复时，所有未完成的任务标记为中断（因为没有实现持久化断点续传）
+            if (value.state === 'in_progress' || value.state === 'paused' || value.state === 'saving') {
+                value.state = 'interrupted';
+                value.error = '会话已过期';
+            }
+            
+            this.downloads.set(value.id, value);
+            count++;
+          }
+        }
+        console.log(`已加载 ${count} 个下载记录`);
+        resolve();
+      });
     });
   }
 
@@ -702,16 +715,22 @@ const downloadManager = new DownloadManager();
 
 // 处理来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // console.log('收到消息:', request);
+  console.log('收到消息:', request.action);
   
-  try {
-    switch (request.action) {
+  // 异步处理消息
+  (async () => {
+    try {
+      switch (request.action) {
       case 'ping':
         sendResponse({success: true, message: 'Background script is running'});
         break;
       
       case 'getDownloads':
         try {
+          // 等待初始化完成
+          while (!downloadManager.isReady) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
           const downloads = downloadManager.getAllDownloads();
           sendResponse({success: true, downloads: downloads});
         } catch (error) {
@@ -781,6 +800,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.error('处理消息异常:', error);
     sendResponse({success: false, error: error.message});
   }
+  })(); // 立即执行异步函数
   
   return true; // 保持消息通道开启
 });

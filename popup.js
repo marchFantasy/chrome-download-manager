@@ -10,6 +10,7 @@ class PopupManager {
     this.currentLanguage = 'en';
     this.messages = {}; // 存储所有语言包数据
     this.translations = {}; // 当前语言翻译
+    this.isLoading = true; // 添加加载状态标志
   }
 
   // 加载所有语言包数据
@@ -186,7 +187,9 @@ class PopupManager {
     this.setI18nTexts();
     this.bindEvents();
     this.checkBackgroundScript();
-    this.loadDownloads();
+    
+    // 等待加载下载列表
+    await this.loadDownloads();
     
     // 监听实时进度更新
     chrome.runtime.onMessage.addListener((request) => {
@@ -283,10 +286,12 @@ class PopupManager {
         // 简单的 diff 检查
         if (JSON.stringify(this.downloads.map(d => d.id)) !== JSON.stringify(response.downloads.map(d => d.id))) {
              this.downloads = response.downloads;
+             this.isLoading = false; // 数据加载完成
              this.renderDownloads();
         } else {
             // 仅更新数据，不重绘 DOM（由 updateDownloadItem 处理）
             this.downloads = response.downloads;
+            this.isLoading = false;
             // 强制更新一次状态文本
             this.downloads.forEach(d => this.updateDownloadItem(d));
         }
@@ -294,6 +299,7 @@ class PopupManager {
       }
     } catch (error) {
       console.error('加载下载列表失败:', error);
+      this.isLoading = false;
     }
   }
   
@@ -365,6 +371,18 @@ class PopupManager {
     const listContainer = document.getElementById('downloadsList');
     const filteredDownloads = this.filterDownloads();
 
+    // 如果正在加载，显示加载状态
+    if (this.isLoading) {
+      listContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <p>加载中...</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 如果没有下载记录，显示空状态
     if (filteredDownloads.length === 0) {
       listContainer.innerHTML = `
         <div class="empty-state">
