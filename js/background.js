@@ -2,7 +2,10 @@
 // 处理下载事件和管理下载状态
 
 // 引入核心下载器
+// eslint-disable-next-line no-undef
 importScripts('/js/core/downloader.js');
+
+/* global Downloader */
 
 class DownloadManager {
   constructor() {
@@ -174,39 +177,47 @@ class DownloadManager {
     });
   }
 
-  // 删除下载（包含同步删除磁盘文件）
+  // 删除下载记录（包括本地文件）
   eraseDownload(downloadId) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        console.log(`删除下载记录: ID ${downloadId}`);
-        
-        // 1. 检查是否为内部下载
-        const downloadInfo = this.downloads.get(downloadId);
-        if (downloadInfo && downloadInfo.downloader) {
-            // 如果正在下载，先取消
-            downloadInfo.downloader.cancel();
+    const downloadInfo = this.downloads.get(downloadId);
+    
+    if (!downloadInfo) {
+      return Promise.reject(new Error('下载记录不存在'));
+    }
+
+    // 先删除存储中的记录
+    const storageKey = `download_${downloadId}`;
+    
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.remove(storageKey, () => {
+        if (chrome.runtime.lastError) {
+          console.error('删除存储记录失败:', chrome.runtime.lastError);
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
         }
 
-        // 2. 从内存和存储中移除
+        // 从内存中删除
         this.downloads.delete(downloadId);
-        this.removeDownloadInfo(downloadId);
-        
-        // 3. 尝试从Chrome历史中移除（如果是已保存的文件）
-        // 注意：这里我们主要管理自己的记录，Chrome的历史记录作为辅助
-        // 如果有对应的Chrome Download ID (finalDownloadId)，也尝试删除
-        if (downloadInfo && downloadInfo.finalDownloadId) {
-             chrome.downloads.erase({id: downloadInfo.finalDownloadId}, () => {
-                 if (chrome.runtime.lastError) console.warn('删除Chrome记录失败:', chrome.runtime.lastError);
-             });
+        console.log(`已删除下载记录: ${downloadId}`);
+
+        // 如果有关联的 Chrome 下载 ID，尝试删除文件
+        if (downloadInfo.finalDownloadId) {
+          chrome.downloads.removeFile(downloadInfo.finalDownloadId, () => {
+            if (chrome.runtime.lastError) {
+              console.warn('删除文件失败（可能已被删除）:', chrome.runtime.lastError);
+            }
+            // 删除 Chrome 下载记录
+            chrome.downloads.erase({ id: downloadInfo.finalDownloadId }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('删除 Chrome 记录失败:', chrome.runtime.lastError);
+              }
+              resolve();
+            });
+          });
+        } else {
+          resolve();
         }
-
-        console.log(`✅ 下载记录已删除: ID ${downloadId}`);
-        resolve();
-
-      } catch (error) {
-        console.error('删除下载时发生错误:', error);
-        reject(error);
-      }
+      });
     });
   }
 

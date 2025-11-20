@@ -1,0 +1,19 @@
+{
+  "name": "chrome-download-manager",
+  "version": "1.0.0",
+  "description": "一个功能强大的 Chrome 浏览器扩展，提供高级下载管理功能，包括多线程分块下载、断点续传和独立的下载记录管理。",
+  "type": "module",
+  "main": "popup.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0"
+  }
+}
