@@ -16,16 +16,16 @@ class ContentScript {
   handleMessage(request, sender, sendResponse) {
     switch (request.action) {
       case 'getPageLinks':
-        sendResponse({links: this.getPageLinks()});
+        sendResponse({ links: this.getPageLinks() });
         break;
 
       case 'downloadLink':
         // 这个action不再使用，因为不再拦截页面链接
-        sendResponse({success: false, error: '不再支持页面拦截下载'});
+        sendResponse({ success: false, error: '不再支持页面拦截下载' });
         break;
 
       default:
-        sendResponse({success: false, error: '未知操作'});
+        sendResponse({ success: false, error: '未知操作' });
     }
   }
 
@@ -43,7 +43,7 @@ class ContentScript {
         index,
         url: href,
         text: text || filename,
-        filename: filename
+        filename: filename,
       });
     });
 
