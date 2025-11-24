@@ -55,7 +55,15 @@ class ContentScript {
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
+      let filename = pathname.substring(pathname.lastIndexOf('/') + 1);
+
+      // URL 解码文件名（处理中文等特殊字符）
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (decodeError) {
+        console.warn('文件名 URL 解码失败，使用原始文件名:', decodeError);
+      }
+
       return filename || '未知文件';
     } catch (e) {
       return '未知文件';

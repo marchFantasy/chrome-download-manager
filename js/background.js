@@ -605,6 +605,13 @@ class DownloadManager {
       // 移除查询参数
       filename = filename.split('?')[0];
 
+      // URL 解码文件名（处理中文等特殊字符）
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (decodeError) {
+        console.warn('文件名 URL 解码失败，使用原始文件名:', decodeError);
+      }
+
       // 如果仍然没有文件名，使用域名 + 时间戳
       if (!filename) {
         const hostname = urlObj.hostname.replace(/\./g, '_');
@@ -629,13 +636,20 @@ class DownloadManager {
       if (!filePath) return null;
       // Windows 路径使用 \，Unix/Linux 使用 /
       const normalizedPath = filePath.replace(/\\/g, '/');
-      const filename = normalizedPath.substring(
+      let filename = normalizedPath.substring(
         normalizedPath.lastIndexOf('/') + 1
       );
 
       // 如果提取出的文件名为空或无效，返回 null
       if (!filename || filename.trim() === '') {
         return null;
+      }
+
+      // URL 解码文件名（处理中文等特殊字符）
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (decodeError) {
+        console.warn('文件名 URL 解码失败，使用原始文件名:', decodeError);
       }
 
       return filename;
