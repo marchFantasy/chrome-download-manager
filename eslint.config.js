@@ -7,8 +7,8 @@ export default [
   {
     ignores: [
       'node_modules/**',
-      'eslint.config.js'  // 忽略配置文件本身
-    ]
+      'eslint.config.js', // 忽略配置文件本身
+    ],
   },
   js.configs.recommended,
   {
@@ -19,12 +19,21 @@ export default [
         ...globals.browser,
         ...globals.webextensions,
         chrome: 'readonly',
-        importScripts: 'readonly'  // Service Worker 全局函数
-      }
+        importScripts: 'readonly', // Service Worker 全局函数
+      },
     },
     rules: {
+      'no-undef': 'error',
       'no-unused-vars': 'warn',
-      'no-undef': 'error'
-    }
-  }
+      'no-case-declarations': 'error',
+      indent: [
+        'error',
+        2,
+        {
+          SwitchCase: 1,
+          ignoredNodes: ['TemplateLiteral > *', 'TemplateLiteral'],
+        },
+      ], // 强制使用 2 个空格缩进
+    },
+  },
 ];

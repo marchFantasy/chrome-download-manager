@@ -138,10 +138,12 @@ class PopupManager {
     if (selectAllBtn) selectAllBtn.textContent = this._('selectAll');
 
     const clearSelectionBtn = document.getElementById('clearSelectionBtn');
-    if (clearSelectionBtn) clearSelectionBtn.textContent = this._('clearSelection');
+    if (clearSelectionBtn)
+      clearSelectionBtn.textContent = this._('clearSelection');
 
     const clearCompletedBtn = document.getElementById('clearCompletedBtn');
-    if (clearCompletedBtn) clearCompletedBtn.textContent = this._('clearCompleted');
+    if (clearCompletedBtn)
+      clearCompletedBtn.textContent = this._('clearCompleted');
 
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.textContent = `📤 ${this._('exportDownloads')}`;
@@ -166,7 +168,8 @@ class PopupManager {
 
     // 更新添加下载按钮
     const addDownloadBtn = document.getElementById('addDownloadBtn');
-    if (addDownloadBtn) addDownloadBtn.textContent = `➕ ${this._('addDownloadBtn')}`;
+    if (addDownloadBtn)
+      addDownloadBtn.textContent = `➕ ${this._('addDownloadBtn')}`;
 
     // 更新批量操作相关文本
     this.updateBatchActions();
@@ -188,31 +191,31 @@ class PopupManager {
     this.setI18nTexts();
     this.bindEvents();
     this.checkBackgroundScript();
-    
+
     // 等待加载下载列表
     await this.loadDownloads();
-    
+
     // 监听实时进度更新
     chrome.runtime.onMessage.addListener((request) => {
-        if (request.action === 'downloadProgress') {
-            this.updateDownloadItem(request.data);
-        }
+      if (request.action === 'downloadProgress') {
+        this.updateDownloadItem(request.data);
+      }
     });
 
     this.startAutoRefresh();
   }
-  
+
   // 自动刷新（降低频率，主要依赖消息推送）
   startAutoRefresh() {
-      setInterval(() => {
-          this.loadDownloads();
-      }, 2000);
+    setInterval(() => {
+      this.loadDownloads();
+    }, 2000);
   }
 
   // 检查background script是否可用
   async checkBackgroundScript() {
     try {
-      await this.sendMessage({action: 'ping'});
+      await this.sendMessage({ action: 'ping' });
       console.log('Background script连接正常');
     } catch (error) {
       console.error('Background script连接失败:', error);
@@ -223,20 +226,28 @@ class PopupManager {
   // 绑定事件
   bindEvents() {
     // 语言切换
-    document.getElementById('languageSelect').addEventListener('change', (e) => {
-      this.switchLanguage(e.target.value);
-    });
+    document
+      .getElementById('languageSelect')
+      .addEventListener('change', (e) => {
+        this.switchLanguage(e.target.value);
+      });
 
     // 设置按钮
-    document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
+    document
+      .getElementById('settingsBtn')
+      .addEventListener('click', () => this.openSettings());
 
     // 新增下载
-    document.getElementById('addDownloadBtn').addEventListener('click', () => this.addDownload());
-    document.getElementById('downloadUrlInput').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        this.addDownload();
-      }
-    });
+    document
+      .getElementById('addDownloadBtn')
+      .addEventListener('click', () => this.addDownload());
+    document
+      .getElementById('downloadUrlInput')
+      .addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.addDownload();
+        }
+      });
 
     // 筛选
     document.getElementById('filterSelect').addEventListener('change', (e) => {
@@ -245,27 +256,53 @@ class PopupManager {
     });
 
     // 选择操作
-    document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
-    document.getElementById('clearSelectionBtn').addEventListener('click', () => this.clearSelection());
+    document
+      .getElementById('selectAllBtn')
+      .addEventListener('click', () => this.selectAll());
+    document
+      .getElementById('clearSelectionBtn')
+      .addEventListener('click', () => this.clearSelection());
 
     // 批量操作
-    document.getElementById('batchPauseBtn').addEventListener('click', () => this.batchPause());
-    document.getElementById('batchResumeBtn').addEventListener('click', () => this.batchResume());
-    document.getElementById('batchCancelBtn').addEventListener('click', () => this.batchCancel());
-    document.getElementById('batchDeleteBtn').addEventListener('click', () => this.batchDelete());
+    document
+      .getElementById('batchPauseBtn')
+      .addEventListener('click', () => this.batchPause());
+    document
+      .getElementById('batchResumeBtn')
+      .addEventListener('click', () => this.batchResume());
+    document
+      .getElementById('batchCancelBtn')
+      .addEventListener('click', () => this.batchCancel());
+    document
+      .getElementById('batchDeleteBtn')
+      .addEventListener('click', () => this.batchDelete());
 
     // 底部操作
-    document.getElementById('clearCompletedBtn').addEventListener('click', () => this.clearCompleted());
-    document.getElementById('exportBtn').addEventListener('click', () => this.exportDownloads());
-    document.getElementById('importBtn').addEventListener('click', () => this.importDownloads());
+    document
+      .getElementById('clearCompletedBtn')
+      .addEventListener('click', () => this.clearCompleted());
+    document
+      .getElementById('exportBtn')
+      .addEventListener('click', () => this.exportDownloads());
+    document
+      .getElementById('importBtn')
+      .addEventListener('click', () => this.importDownloads());
 
     // 模态框
-    document.getElementById('closeModal').addEventListener('click', () => this.hideModal());
-    document.getElementById('modalCancel').addEventListener('click', () => this.hideModal());
-    document.getElementById('modalConfirm').addEventListener('click', () => this.confirmModal());
+    document
+      .getElementById('closeModal')
+      .addEventListener('click', () => this.hideModal());
+    document
+      .getElementById('modalCancel')
+      .addEventListener('click', () => this.hideModal());
+    document
+      .getElementById('modalConfirm')
+      .addEventListener('click', () => this.confirmModal());
 
     // 通知
-    document.getElementById('closeNotification').addEventListener('click', () => this.hideNotification());
+    document
+      .getElementById('closeNotification')
+      .addEventListener('click', () => this.hideNotification());
 
     // 点击模态框背景关闭
     document.getElementById('modal').addEventListener('click', (e) => {
@@ -278,21 +315,24 @@ class PopupManager {
   // 加载下载列表
   async loadDownloads() {
     try {
-      const response = await this.sendMessage({action: 'getDownloads'});
+      const response = await this.sendMessage({ action: 'getDownloads' });
 
       if (response && response.downloads) {
         // 只有当列表长度变化或状态发生重大变化时才全量重新渲染
         // 简单的 diff 检查
-        if (JSON.stringify(this.downloads.map(d => d.id)) !== JSON.stringify(response.downloads.map(d => d.id))) {
-             this.downloads = response.downloads;
-             this.isLoading = false; // 数据加载完成
-             this.renderDownloads();
+        if (
+          JSON.stringify(this.downloads.map((d) => d.id)) !==
+          JSON.stringify(response.downloads.map((d) => d.id))
+        ) {
+          this.downloads = response.downloads;
+          this.isLoading = false; // 数据加载完成
+          this.renderDownloads();
         } else {
-            // 仅更新数据，不重绘 DOM（由 updateDownloadItem 处理）
-            this.downloads = response.downloads;
-            this.isLoading = false;
-            // 强制更新一次状态文本
-            this.downloads.forEach(d => this.updateDownloadItem(d));
+          // 仅更新数据，不重绘 DOM（由 updateDownloadItem 处理）
+          this.downloads = response.downloads;
+          this.isLoading = false;
+          // 强制更新一次状态文本
+          this.downloads.forEach((d) => this.updateDownloadItem(d));
         }
         this.updateStats();
       }
@@ -301,68 +341,72 @@ class PopupManager {
       this.isLoading = false;
     }
   }
-  
+
   // 更新单个下载项的 UI
   updateDownloadItem(data) {
-      const item = document.querySelector(`.download-item[data-id="${data.id}"]`);
-      if (!item) return;
-      
-      // 更新进度条
-      const progressFill = item.querySelector('.progress-fill');
-      if (progressFill) {
-          const percentage = data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
-          progressFill.style.width = `${percentage}%`;
+    const item = document.querySelector(`.download-item[data-id="${data.id}"]`);
+    if (!item) return;
+
+    // 更新进度条
+    const progressFill = item.querySelector('.progress-fill');
+    if (progressFill) {
+      const percentage =
+        data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
+      progressFill.style.width = `${percentage}%`;
+    }
+
+    // 更新大小和速度
+    const metaSpan = item.querySelector('.download-meta span:first-child');
+    if (metaSpan) {
+      let text = this.formatSize(data.bytesReceived);
+      if (data.totalBytes) text += ` / ${this.formatSize(data.totalBytes)}`;
+      if (data.state === 'in_progress' && data.speed) {
+        text += ` • ${this.formatSpeed(data.speed)}`;
       }
-      
-      // 更新大小和速度
-      const metaSpan = item.querySelector('.download-meta span:first-child');
-      if (metaSpan) {
-          let text = this.formatSize(data.bytesReceived);
-          if (data.totalBytes) text += ` / ${this.formatSize(data.totalBytes)}`;
-          if (data.state === 'in_progress' && data.speed) {
-              text += ` • ${this.formatSpeed(data.speed)}`;
-          }
-          metaSpan.textContent = text;
+      metaSpan.textContent = text;
+    }
+
+    // 更新状态文本
+    const statusText = item.querySelector('.status-text');
+    if (statusText) {
+      statusText.textContent = this.getStatusText(data);
+    }
+
+    // 如果状态变为完成或失败，可能需要重新渲染按钮
+    const currentStatus = item.getAttribute('data-status');
+    if (currentStatus !== data.state) {
+      item.setAttribute('data-status', data.state);
+      const actionsDiv = item.querySelector('.status-actions');
+      if (actionsDiv) {
+        actionsDiv.innerHTML = this.createActionButtons(data);
+        // 重新绑定按钮事件
+        this.bindDownloadItemEvents();
       }
-      
-      // 更新状态文本
-      const statusText = item.querySelector('.status-text');
-      if (statusText) {
-          statusText.textContent = this.getStatusText(data);
+
+      // 处理进度条的显示/隐藏
+      const progressBar = item.querySelector('.progress-bar');
+
+      if (data.state === 'in_progress') {
+        // 如果恢复下载，需要重新添加进度条
+        if (!progressBar) {
+          const percentage =
+            data.totalBytes > 0
+              ? (data.bytesReceived / data.totalBytes) * 100
+              : 0;
+          const progressHtml = `
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${percentage}%"></div>
+            </div>
+          `;
+          item.insertAdjacentHTML('beforeend', progressHtml);
+        }
+      } else {
+        // 如果下载完成或中断，移除进度条
+        if (progressBar) {
+          progressBar.remove();
+        }
       }
-      
-      // 如果状态变为完成或失败，可能需要重新渲染按钮
-      const currentStatus = item.getAttribute('data-status');
-      if (currentStatus !== data.state) {
-          item.setAttribute('data-status', data.state);
-          const actionsDiv = item.querySelector('.status-actions');
-          if (actionsDiv) {
-              actionsDiv.innerHTML = this.createActionButtons(data);
-              // 重新绑定按钮事件
-              this.bindDownloadItemEvents(); 
-          }
-          
-          // 处理进度条的显示/隐藏
-          const progressBar = item.querySelector('.progress-bar');
-          
-          if (data.state === 'in_progress') {
-              // 如果恢复下载，需要重新添加进度条
-              if (!progressBar) {
-                  const percentage = data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
-                  const progressHtml = `
-                      <div class="progress-bar">
-                          <div class="progress-fill" style="width: ${percentage}%"></div>
-                      </div>
-                  `;
-                  item.insertAdjacentHTML('beforeend', progressHtml);
-              }
-          } else {
-              // 如果下载完成或中断，移除进度条
-              if (progressBar) {
-                  progressBar.remove();
-              }
-          }
-      }
+    }
   }
 
   // 渲染下载列表
@@ -393,9 +437,9 @@ class PopupManager {
       return;
     }
 
-    listContainer.innerHTML = filteredDownloads.map(download => 
-      this.createDownloadItem(download)
-    ).join('');
+    listContainer.innerHTML = filteredDownloads
+      .map((download) => this.createDownloadItem(download))
+      .join('');
 
     // 绑定下载项目事件
     this.bindDownloadItemEvents();
@@ -405,13 +449,13 @@ class PopupManager {
   filterDownloads() {
     switch (this.filter) {
       case 'in_progress':
-        return this.downloads.filter(d => d.state === 'in_progress');
+        return this.downloads.filter((d) => d.state === 'in_progress');
       case 'complete':
-        return this.downloads.filter(d => d.state === 'complete');
+        return this.downloads.filter((d) => d.state === 'complete');
       case 'interrupted':
-        return this.downloads.filter(d => d.state === 'interrupted');
+        return this.downloads.filter((d) => d.state === 'interrupted');
       case 'paused':
-        return this.downloads.filter(d => d.paused);
+        return this.downloads.filter((d) => d.paused);
       default:
         return this.downloads;
     }
@@ -420,48 +464,62 @@ class PopupManager {
   // 创建下载项目
   createDownloadItem(download) {
     const isSelected = this.selectedDownloads.has(download.id);
-    const progress = download.totalBytes > 0 ?
-      Math.round((download.bytesReceived / download.totalBytes) * 100) : 0;
+    const progress =
+      download.totalBytes > 0
+        ? Math.round((download.bytesReceived / download.totalBytes) * 100)
+        : 0;
 
     const statusIcon = this.getStatusIcon(download);
     const statusText = this.getStatusText(download);
-    
-    let sizeText = this.formatSize(download.bytesReceived) +
+
+    let sizeText =
+      this.formatSize(download.bytesReceived) +
       (download.totalBytes ? ` / ${this.formatSize(download.totalBytes)}` : '');
-      
+
     if (download.state === 'in_progress' && download.speed) {
-        sizeText += ` • ${this.formatSpeed(download.speed)}`;
+      sizeText += ` • ${this.formatSpeed(download.speed)}`;
     }
 
     return `
-      <div class="download-item ${isSelected ? 'selected' : ''}" data-id="${download.id}" data-status="${download.state}">
+      <div class="download-item ${isSelected ? 'selected' : ''}" data-id="${
+      download.id
+    }" data-status="${download.state}">
         <div class="download-header">
           <div class="download-info">
-            <div class="download-filename" title="${this.escapeHtml(download.filename)}">${this.escapeHtml(download.filename)}</div>
+            <div class="download-filename" title="${this.escapeHtml(
+              download.filename
+            )}">${this.escapeHtml(download.filename)}</div>
             <div class="download-meta">
               <span>${sizeText}</span>
               <span>${this.formatTime(download.startTime)}</span>
             </div>
           </div>
           <div class="download-actions">
-            <input type="checkbox" class="download-checkbox" ${isSelected ? 'checked' : ''}
-                   data-id="${download.id}">
+            <input type="checkbox" class="download-checkbox" ${
+              isSelected ? 'checked' : ''
+            } data-id="${download.id}">
           </div>
         </div>
         <div class="download-status">
           <div class="status-left">
-            <div class="status-icon ${statusIcon}">${this.getStatusEmoji(download)}</div>
+            <div class="status-icon ${statusIcon}">${this.getStatusEmoji(
+      download
+    )}</div>
             <span class="status-text">${statusText}</span>
           </div>
           <div class="status-actions">
             ${this.createActionButtons(download)}
           </div>
         </div>
-        ${download.state === 'in_progress' ? `
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: ${progress}%"></div>
-          </div>
-        ` : ''}
+        ${
+          download.state === 'in_progress'
+            ? `
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${progress}%"></div>
+        </div>
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -471,23 +529,36 @@ class PopupManager {
     const buttons = [];
 
     if (download.state === 'in_progress' && !download.paused) {
-      buttons.push(`<button class="btn btn-sm" data-action="pause" data-id="${download.id}">⏸️</button>`);
+      buttons.push(
+        `<button class="btn btn-sm" data-action="pause" data-id="${download.id}">⏸️</button>`
+      );
     } else if (download.state === 'in_progress' && download.paused) {
-      buttons.push(`<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`);
-    } else if (download.state === 'paused') { // 兼容 paused 状态
-      buttons.push(`<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`);
+      buttons.push(
+        `<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`
+      );
+    } else if (download.state === 'paused') {
+      // 兼容 paused 状态
+      buttons.push(
+        `<button class="btn btn-sm" data-action="resume" data-id="${download.id}">▶️</button>`
+      );
     }
 
     if (download.state === 'in_progress' || download.state === 'paused') {
-      buttons.push(`<button class="btn btn-sm" data-action="cancel" data-id="${download.id}">❌</button>`);
+      buttons.push(
+        `<button class="btn btn-sm" data-action="cancel" data-id="${download.id}">❌</button>`
+      );
     }
 
     // 添加打开文件夹按钮（仅对已完成的下载显示）
     if (download.state === 'complete') {
-      buttons.push(`<button class="btn btn-sm" data-action="openFolder" data-id="${download.id}">📁</button>`);
+      buttons.push(
+        `<button class="btn btn-sm" data-action="openFolder" data-id="${download.id}">📁</button>`
+      );
     }
 
-    buttons.push(`<button class="btn btn-sm btn-danger" data-action="delete" data-id="${download.id}">🗑️</button>`);
+    buttons.push(
+      `<button class="btn btn-sm btn-danger" data-action="delete" data-id="${download.id}">🗑️</button>`
+    );
 
     return buttons.join('');
   }
@@ -495,7 +566,7 @@ class PopupManager {
   // 绑定下载项目事件
   bindDownloadItemEvents() {
     // 复选框事件
-    document.querySelectorAll('.download-checkbox').forEach(checkbox => {
+    document.querySelectorAll('.download-checkbox').forEach((checkbox) => {
       checkbox.addEventListener('change', (e) => {
         const downloadId = e.target.dataset.id; // ID 可能是字符串
         if (e.target.checked) {
@@ -509,7 +580,7 @@ class PopupManager {
     });
 
     // 操作按钮事件
-    document.querySelectorAll('[data-action]').forEach(button => {
+    document.querySelectorAll('[data-action]').forEach((button) => {
       button.addEventListener('click', (e) => {
         e.stopPropagation();
         const action = button.dataset.action;
@@ -519,9 +590,12 @@ class PopupManager {
     });
 
     // 下载项目点击事件
-    document.querySelectorAll('.download-item').forEach(item => {
+    document.querySelectorAll('.download-item').forEach((item) => {
       item.addEventListener('click', (e) => {
-        if (e.target.type !== 'checkbox' && !e.target.hasAttribute('data-action')) {
+        if (
+          e.target.type !== 'checkbox' &&
+          !e.target.hasAttribute('data-action')
+        ) {
           const downloadId = item.dataset.id;
           this.toggleDownloadSelection(downloadId);
         }
@@ -534,29 +608,38 @@ class PopupManager {
     try {
       switch (action) {
         case 'pause':
-          await this.sendMessage({action: 'pauseDownload', downloadId});
+          await this.sendMessage({ action: 'pauseDownload', downloadId });
           break;
         case 'resume':
-          await this.sendMessage({action: 'resumeDownload', downloadId});
+          await this.sendMessage({ action: 'resumeDownload', downloadId });
           break;
         case 'cancel': {
-          const response = await this.sendMessage({action: 'cancelDownload', downloadId});
+          const response = await this.sendMessage({
+            action: 'cancelDownload',
+            downloadId,
+          });
           if (response && response.success) {
             this.showNotification(this._('operationSuccess'));
             this.loadDownloads();
           } else {
-            this.showNotification(response?.error || this._('operationFailed'), 'error');
+            this.showNotification(
+              response?.error || this._('operationFailed'),
+              'error'
+            );
           }
           break;
         }
         case 'openFolder': {
           // 打开文件所在的文件夹
-          const download = this.downloads.find(d => d.id == downloadId);
+          const download = this.downloads.find((d) => d.id == downloadId);
           if (download && download.finalDownloadId) {
             // 使用 Chrome API 在文件管理器中显示文件
             chrome.downloads.show(download.finalDownloadId);
           } else {
-            this.showNotification('无法打开文件夹：文件未保存或已被删除', 'error');
+            this.showNotification(
+              '无法打开文件夹：文件未保存或已被删除',
+              'error'
+            );
           }
           return;
         }
@@ -572,7 +655,7 @@ class PopupManager {
 
   // 显示删除确认
   showDeleteConfirm(downloadId) {
-    const download = this.downloads.find(d => d.id == downloadId);
+    const download = this.downloads.find((d) => d.id == downloadId);
     const fileName = download ? download.filename : this._('fileNotExists');
     this.showModal(
       this._('confirmDelete'),
@@ -580,14 +663,17 @@ class PopupManager {
       async () => {
         try {
           // 先从本地列表移除
-          this.downloads = this.downloads.filter(d => d.id != downloadId);
-          this.renderDownloads(); 
+          this.downloads = this.downloads.filter((d) => d.id != downloadId);
+          this.renderDownloads();
 
-          await this.sendMessage({action: 'eraseDownload', downloadId});
+          await this.sendMessage({ action: 'eraseDownload', downloadId });
           this.showNotification(this._('operationSuccess'));
         } catch (error) {
           this.loadDownloads();
-          this.showNotification(this._('operationFailed', error.message), 'error');
+          this.showNotification(
+            this._('operationFailed', error.message),
+            'error'
+          );
         }
       }
     );
@@ -595,7 +681,9 @@ class PopupManager {
 
   // 选择/取消选择下载
   toggleDownloadSelection(downloadId) {
-    const checkbox = document.querySelector(`.download-checkbox[data-id="${downloadId}"]`);
+    const checkbox = document.querySelector(
+      `.download-checkbox[data-id="${downloadId}"]`
+    );
     if (checkbox) {
       checkbox.checked = !checkbox.checked;
       checkbox.dispatchEvent(new Event('change'));
@@ -604,7 +692,9 @@ class PopupManager {
 
   // 更新下载项目选择状态
   updateDownloadItemSelection(downloadId, selected) {
-    const item = document.querySelector(`.download-item[data-id="${downloadId}"]`);
+    const item = document.querySelector(
+      `.download-item[data-id="${downloadId}"]`
+    );
     if (item) {
       item.classList.toggle('selected', selected);
     }
@@ -614,11 +704,11 @@ class PopupManager {
   selectAll() {
     const filteredDownloads = this.filterDownloads();
     this.selectedDownloads.clear();
-    
-    filteredDownloads.forEach(download => {
+
+    filteredDownloads.forEach((download) => {
       this.selectedDownloads.add(download.id);
     });
-    
+
     this.renderDownloads();
     this.updateBatchActions();
   }
@@ -637,7 +727,10 @@ class PopupManager {
 
     if (this.selectedDownloads.size > 0) {
       batchActions.style.display = 'flex';
-      selectedCount.textContent = this._('selectedCount', String(this.selectedDownloads.size));
+      selectedCount.textContent = this._(
+        'selectedCount',
+        String(this.selectedDownloads.size)
+      );
     } else {
       batchActions.style.display = 'none';
     }
@@ -647,11 +740,12 @@ class PopupManager {
   async batchPause() {
     const downloadIds = Array.from(this.selectedDownloads);
     try {
-      await this.sendMessage({action: 'batchPause', downloadIds});
+      await this.sendMessage({ action: 'batchPause', downloadIds });
       this.showNotification('批量暂停成功');
-      this.loadDownloads();
+      // 先清除选中状态，再重新加载列表，避免渲染时使用旧的选中状态
       this.selectedDownloads.clear();
       this.updateBatchActions();
+      this.loadDownloads();
     } catch (error) {
       this.showNotification('批量暂停失败: ' + error.message, 'error');
     }
@@ -661,11 +755,12 @@ class PopupManager {
   async batchResume() {
     const downloadIds = Array.from(this.selectedDownloads);
     try {
-      await this.sendMessage({action: 'batchResume', downloadIds});
+      await this.sendMessage({ action: 'batchResume', downloadIds });
       this.showNotification('批量继续成功');
-      this.loadDownloads();
+      // 先清除选中状态，再重新加载列表，避免渲染时使用旧的选中状态
       this.selectedDownloads.clear();
       this.updateBatchActions();
+      this.loadDownloads();
     } catch (error) {
       this.showNotification('批量继续失败: ' + error.message, 'error');
     }
@@ -679,13 +774,17 @@ class PopupManager {
       this._('batchCancelConfirmMessage', String(downloadIds.length)),
       async () => {
         try {
-          await this.sendMessage({action: 'batchCancel', downloadIds});
+          await this.sendMessage({ action: 'batchCancel', downloadIds });
           this.showNotification(this._('operationSuccess'));
-          this.loadDownloads();
+          // 先清除选中状态，再重新加载列表，避免渲染时使用旧的选中状态
           this.selectedDownloads.clear();
           this.updateBatchActions();
+          this.loadDownloads();
         } catch (error) {
-          this.showNotification(this._('operationFailed', error.message), 'error');
+          this.showNotification(
+            this._('operationFailed', error.message),
+            'error'
+          );
         }
       }
     );
@@ -695,7 +794,10 @@ class PopupManager {
   async batchDelete() {
     const downloadIds = Array.from(this.selectedDownloads);
     if (downloadIds.length === 0) {
-      this.showNotification(this._('operationFailed', '请先选择要删除的下载'), 'error');
+      this.showNotification(
+        this._('operationFailed', '请先选择要删除的下载'),
+        'error'
+      );
       return;
     }
 
@@ -704,16 +806,23 @@ class PopupManager {
       this._('batchDeleteConfirmMessage', String(downloadIds.length)),
       async () => {
         try {
-          this.downloads = this.downloads.filter(d => !downloadIds.includes(d.id));
-          this.renderDownloads();
-
-          await this.sendMessage({action: 'batchErase', downloadIds});
-          this.showNotification(this._('operationSuccess'));
+          // 先清除选中状态，避免渲染时使用旧的选中状态
           this.selectedDownloads.clear();
           this.updateBatchActions();
+
+          this.downloads = this.downloads.filter(
+            (d) => !downloadIds.includes(d.id)
+          );
+          this.renderDownloads();
+
+          await this.sendMessage({ action: 'batchErase', downloadIds });
+          this.showNotification(this._('operationSuccess'));
         } catch (error) {
           this.loadDownloads();
-          this.showNotification(this._('operationFailed', error.message), 'error');
+          this.showNotification(
+            this._('operationFailed', error.message),
+            'error'
+          );
         }
       }
     );
@@ -721,9 +830,14 @@ class PopupManager {
 
   // 清除已完成
   async clearCompleted() {
-    const completedDownloads = this.downloads.filter(d => d.state === 'complete');
+    const completedDownloads = this.downloads.filter(
+      (d) => d.state === 'complete'
+    );
     if (completedDownloads.length === 0) {
-      this.showNotification(this._('operationFailed', '没有已完成的下载'), 'error');
+      this.showNotification(
+        this._('operationFailed', '没有已完成的下载'),
+        'error'
+      );
       return;
     }
 
@@ -732,16 +846,19 @@ class PopupManager {
       this._('clearCompletedConfirmMessage', String(completedDownloads.length)),
       async () => {
         try {
-          const downloadIds = completedDownloads.map(d => d.id);
+          const downloadIds = completedDownloads.map((d) => d.id);
 
-          this.downloads = this.downloads.filter(d => d.state !== 'complete');
+          this.downloads = this.downloads.filter((d) => d.state !== 'complete');
           this.renderDownloads();
 
-          await this.sendMessage({action: 'batchErase', downloadIds});
+          await this.sendMessage({ action: 'batchErase', downloadIds });
           this.showNotification(this._('operationSuccess'));
         } catch (error) {
           this.loadDownloads();
-          this.showNotification(this._('operationFailed', error.message), 'error');
+          this.showNotification(
+            this._('operationFailed', error.message),
+            'error'
+          );
         }
       }
     );
@@ -751,17 +868,19 @@ class PopupManager {
   exportDownloads() {
     const data = {
       downloads: this.downloads,
-      exportTime: new Date().toISOString()
+      exportTime: new Date().toISOString(),
     };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `downloads_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
-    
+
     URL.revokeObjectURL(url);
     this.showNotification('导出成功');
   }
@@ -781,11 +900,11 @@ class PopupManager {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    
+
     input.onchange = (e) => {
       this.showNotification('导入功能开发中...');
     };
-    
+
     input.click();
   }
 
@@ -793,7 +912,10 @@ class PopupManager {
   updateStats() {
     const lastUpdate = document.getElementById('lastUpdate');
     if (lastUpdate) {
-      lastUpdate.textContent = this._('lastUpdate', new Date().toLocaleTimeString());
+      lastUpdate.textContent = this._(
+        'lastUpdate',
+        new Date().toLocaleTimeString()
+      );
     }
   }
 
@@ -814,26 +936,29 @@ class PopupManager {
     const url = urlInput.value.trim();
 
     if (!url) {
-        this.showNotification('请输入下载链接', 'error');
-        return;
+      this.showNotification('请输入下载链接', 'error');
+      return;
     }
-    
+
     // 直接调用 background 的下载方法（通过创建下载事件触发拦截，或者直接发消息）
     // 为了统一逻辑，我们直接发消息给 background 让它开始内部下载
     // 但是 background 目前是通过拦截 onCreated 工作的。
     // 所以我们这里调用 chrome.downloads.download，它会触发 onCreated，然后被 background 拦截。
-    
+
     try {
-        chrome.downloads.download({url: url}, (id) => {
-            if (chrome.runtime.lastError) {
-                this.showNotification('创建下载失败: ' + chrome.runtime.lastError.message, 'error');
-            } else {
-                this.showNotification('下载已开始');
-                urlInput.value = '';
-            }
-        });
+      chrome.downloads.download({ url: url }, (id) => {
+        if (chrome.runtime.lastError) {
+          this.showNotification(
+            '创建下载失败: ' + chrome.runtime.lastError.message,
+            'error'
+          );
+        } else {
+          this.showNotification('下载已开始');
+          urlInput.value = '';
+        }
+      });
     } catch (e) {
-        this.showNotification('创建下载异常: ' + e.message, 'error');
+      this.showNotification('创建下载异常: ' + e.message, 'error');
     }
   }
 
@@ -854,12 +979,12 @@ class PopupManager {
   showNotification(message, type = 'success') {
     const notification = document.getElementById('notification');
     const messageEl = document.getElementById('notificationMessage');
-    
+
     if (notification && messageEl) {
       messageEl.textContent = message;
       notification.className = `notification show ${type}`;
       notification.style.display = 'block';
-      
+
       // 清除之前的定时器
       if (this.notificationTimer) {
         clearTimeout(this.notificationTimer);
@@ -885,7 +1010,7 @@ class PopupManager {
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalMessage = document.getElementById('modalMessage');
-    
+
     if (modal && modalTitle && modalMessage) {
       modalTitle.textContent = title;
       modalMessage.textContent = message;
@@ -919,10 +1044,10 @@ class PopupManager {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
-  
+
   // 格式化速度
   formatSpeed(bytesPerSec) {
-      return this.formatSize(bytesPerSec) + '/s';
+    return this.formatSize(bytesPerSec) + '/s';
   }
 
   // 格式化时间
@@ -934,33 +1059,48 @@ class PopupManager {
   // 获取状态图标
   getStatusIcon(download) {
     switch (download.state) {
-      case 'in_progress': return 'status-active';
-      case 'complete': return 'status-complete';
-      case 'interrupted': return 'status-error';
-      case 'paused': return 'status-paused';
-      default: return '';
+      case 'in_progress':
+        return 'status-active';
+      case 'complete':
+        return 'status-complete';
+      case 'interrupted':
+        return 'status-error';
+      case 'paused':
+        return 'status-paused';
+      default:
+        return '';
     }
   }
 
   // 获取状态文本
   getStatusText(download) {
     switch (download.state) {
-      case 'in_progress': return this._('inProgress');
-      case 'complete': return this._('completed');
-      case 'interrupted': return this._('interrupted');
-      case 'paused': return this._('paused');
-      default: return download.state;
+      case 'in_progress':
+        return this._('inProgress');
+      case 'complete':
+        return this._('completed');
+      case 'interrupted':
+        return this._('interrupted');
+      case 'paused':
+        return this._('paused');
+      default:
+        return download.state;
     }
   }
 
   // 获取状态Emoji
   getStatusEmoji(download) {
     switch (download.state) {
-      case 'in_progress': return '⬇️';
-      case 'complete': return '✅';
-      case 'interrupted': return '❌';
-      case 'paused': return '⏸️';
-      default: return '❓';
+      case 'in_progress':
+        return '⬇️';
+      case 'complete':
+        return '✅';
+      case 'interrupted':
+        return '❌';
+      case 'paused':
+        return '⏸️';
+      default:
+        return '❓';
     }
   }
 
