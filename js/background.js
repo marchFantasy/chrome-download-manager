@@ -7,6 +7,46 @@ importScripts('/js/core/downloader.js');
 
 /* global Downloader */
 
+// ============================================================================
+// 全局变量和顶层事件监听器
+// ============================================================================
+// 说明: Service Worker 在休眠后唤醒时,需要立即能够拦截下载事件
+// 因此必须在脚本顶层立即注册事件监听器,而不是在异步 init() 方法中注册
+
+let downloadManager = null; // 全局下载管理器实例引用
+
+// 立即注册下载创建事件监听器
+chrome.downloads.onCreated.addListener((downloadItem) => {
+  if (downloadManager) {
+    downloadManager.onDownloadCreated(downloadItem);
+  } else {
+    console.warn(
+      'DownloadManager 尚未初始化,下载事件被忽略:',
+      downloadItem.url
+    );
+  }
+});
+
+// 立即注册下载状态变化监听器
+chrome.downloads.onChanged.addListener((downloadDelta) => {
+  if (downloadManager) {
+    downloadManager.onDownloadChanged(downloadDelta);
+  }
+});
+
+// 立即注册下载删除监听器
+chrome.downloads.onErased.addListener((downloadId) => {
+  if (downloadManager) {
+    downloadManager.onDownloadErased(downloadId);
+  }
+});
+
+console.log('下载事件监听器已在顶层注册 (Service Worker 唤醒时立即可用)');
+
+// ============================================================================
+// DownloadManager 类定义
+// ============================================================================
+
 class DownloadManager {
   constructor() {
     this.downloads = new Map(); // 存储下载信息 (包含 Downloader 实例)
@@ -16,6 +56,7 @@ class DownloadManager {
     this.internalDownloadIds = new Set(); // 追踪由本扩展发起的下载ID（用于最终保存文件）
     this.largeFileUrls = new Set(); // 追踪大文件的 URL，避免重复拦截
     this.isReady = false; // 标记初始化是否完成
+    this.isFirstRun = false; // 标记是否是首次运行（区分首次启动和 Service Worker 唤醒）
     this.initStartTime = Date.now(); // 记录初始化开始时间
     this.INIT_GRACE_PERIOD = 3000; // 初始化保护期：3秒，避免拦截 Chrome 自动恢复的下载
     this.init();
@@ -31,11 +72,21 @@ class DownloadManager {
     }
 
     try {
-      // 注册事件监听器
-      chrome.downloads.onCreated.addListener(this.onDownloadCreated.bind(this));
-      chrome.downloads.onChanged.addListener(this.onDownloadChanged.bind(this));
-      chrome.downloads.onErased.addListener(this.onDownloadErased.bind(this));
-      console.log('下载事件监听器已注册');
+      // 检查是否是首次运行（使用 session storage 区分首次启动和 Service Worker 唤醒）
+      const session = await chrome.storage.session.get('initialized');
+      this.isFirstRun = !session.initialized;
+
+      if (this.isFirstRun) {
+        console.log('首次运行检测: 这是扩展首次启动或更新后的首次运行');
+        console.log(
+          '初始化保护期已启用，将在 3 秒内忽略下载事件（避免拦截 Chrome 自动恢复的下载）'
+        );
+        await chrome.storage.session.set({ initialized: true });
+      } else {
+        console.log('Service Worker 唤醒检测: 跳过初始化保护期，立即拦截下载');
+      }
+
+      // 注意: 事件监听器已在脚本顶层注册，无需在此重复注册
 
       // 禁用默认下载栏
       this.disableDownloadShelf();
@@ -440,14 +491,17 @@ class DownloadManager {
   onDownloadCreated(downloadItem) {
     console.log('下载创建事件:', downloadItem);
 
-    // 0. 初始化保护期：避免拦截 Chrome 自动恢复的下载
-    const timeSinceInit = Date.now() - this.initStartTime;
-    if (timeSinceInit < this.INIT_GRACE_PERIOD) {
-      console.log(
-        `初始化保护期内（${timeSinceInit}ms < ${this.INIT_GRACE_PERIOD}ms），忽略下载事件:`,
-        downloadItem.url
-      );
-      return;
+    // 0. 初始化保护期：只在首次运行时启用,避免拦截 Chrome 自动恢复的下载
+    // Service Worker 唤醒时跳过此检查,立即拦截下载
+    if (this.isFirstRun) {
+      const timeSinceInit = Date.now() - this.initStartTime;
+      if (timeSinceInit < this.INIT_GRACE_PERIOD) {
+        console.log(
+          `首次运行保护期内（${timeSinceInit}ms < ${this.INIT_GRACE_PERIOD}ms），忽略下载事件:`,
+          downloadItem.url
+        );
+        return;
+      }
     }
 
     // 1. 检查是否是我们自己发起的最终保存任务
@@ -799,8 +853,8 @@ class DownloadManager {
   }
 }
 
-// 初始化下载管理器
-const downloadManager = new DownloadManager();
+// 初始化下载管理器 (赋值给全局变量,已在顶层声明)
+downloadManager = new DownloadManager();
 
 // 处理来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
