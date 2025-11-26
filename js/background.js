@@ -473,10 +473,27 @@ class DownloadManager {
     };
 
     downloader.onError = (data) => {
+      const errorTime = Date.now();
+      const duration = errorTime - downloadInfo.startTime;
+
+      console.error('========== 下载错误 (background.js) ==========');
+      console.error(`文件名: ${filename}`);
+      console.error(`URL: ${url}`);
+      console.error(`错误信息: ${data.error}`);
+      console.error(`中断原因: ${data.interruptReason || '未知'}`);
+      console.error(`耗时: ${duration}ms (${(duration / 1000).toFixed(2)}秒)`);
+      console.error(
+        `已下载: ${data.bytesReceived || 0} / ${data.totalBytes || 0} bytes`
+      );
+      console.error(`错误发生时间: ${new Date(errorTime).toISOString()}`);
+      console.error('==========================================');
+
       downloadInfo.state = 'interrupted';
       downloadInfo.error = data.error;
+      downloadInfo.interruptReason = data.interruptReason;
+      downloadInfo.endTime = errorTime;
       this.saveDownloadInfo(downloadInfo);
-      this.showNotification('下载失败', `❌ ${filename}`);
+      this.showNotification('下载失败', `❌ ${filename}\n原因: ${data.error}`);
     };
 
     // 存储并开始
@@ -549,6 +566,15 @@ class DownloadManager {
     const filename =
       this.extractBaseFilename(downloadItem.filename) ||
       this.extractFilename(downloadItem.url);
+
+    console.log('========== 拦截下载详情 ==========');
+    console.log(`时间: ${new Date().toISOString()}`);
+    console.log(`文件名: ${filename}`);
+    console.log(`URL: ${downloadItem.url}`);
+    console.log(`原始下载ID: ${downloadItem.id}`);
+    console.log(`MIME类型: ${downloadItem.mime || '未知'}`);
+    console.log('====================================');
+
     this.startInternalDownload(downloadItem.url, filename);
   }
 

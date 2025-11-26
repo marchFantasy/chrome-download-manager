@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>下载测试页面</title>
+    <style>
+      body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          max-width: 800px;
+          margin: 50px auto;
+          padding: 20px;
+          background: #f5f5f5;
+      }
+      h1 {
+          color: #333;
+          border-bottom: 3px solid #4CAF50;
+          padding-bottom: 10px;
+      }
+      .test-section {
+          background: white;
+          padding: 20px;
+          margin: 20px 0;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .test-section h2 {
+          color: #4CAF50;
+          margin-top: 0;
+      }
+      .download-link {
+          display: inline-block;
+          padding: 10px 20px;
+          margin: 10px 10px 10px 0;
+          background: #4CAF50;
+          color: white;
+          text-decoration: none;
+          border-radius: 4px;
+          transition: background 0.3s;
+      }
+      .download-link:hover {
+          background: #45a049;
+      }
+      .info {
+          background: #e3f2fd;
+          padding: 15px;
+          border-left: 4px solid #2196F3;
+          margin: 15px 0;
+      }
+      .warning {
+          background: #fff3e0;
+          padding: 15px;
+          border-left: 4px solid #ff9800;
+          margin: 15px 0;
+      }
+      code {
+          background: #f4f4f4;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-family: 'Courier New', monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📥 Chrome 下载管理器 - 测试页面</h1>
+
+    <div class="info">
+      <strong>使用说明:</strong>
+      <ol>
+        <li>按 <code>F12</code> 打开浏览器开发者工具</li>
+        <li>切换到 <code>Console</code> 标签</li>
+        <li>点击下面的下载链接</li>
+        <li>观察控制台输出的详细日志</li>
+      </ol>
+    </div>
+
+    <div class="test-section">
+      <h2>测试1: 小文件下载 (支持分块)</h2>
+      <p>测试正常的下载流程,观察分块下载的日志输出</p>
+      <a href="https://speed.hetzner.de/1MB.bin" class="download-link" download
+        >下载 1MB 测试文件</a
+      >
+      <a href="https://speed.hetzner.de/10MB.bin" class="download-link" download
+        >下载 10MB 测试文件</a
+      >
+    </div>
+
+    <div class="test-section">
+      <h2>测试2: 大文件下载</h2>
+      <p>测试大文件的下载流程(>50MB 会使用原生下载)</p>
+      <a
+        href="https://speed.hetzner.de/100MB.bin"
+        class="download-link"
+        download
+        >下载 100MB 测试文件</a
+      >
+    </div>
+
+    <div class="test-section">
+      <h2>测试3: 不支持 Range 的服务器</h2>
+      <p>测试单线程下载模式的日志输出</p>
+      <a href="https://httpbin.org/image/png" class="download-link" download
+        >下载图片 (httpbin)</a
+      >
+    </div>
+
+    <div class="warning">
+      <strong>⚠️ 注意事项:</strong>
+      <ul>
+        <li>如果下载在5秒内中断,请仔细查看控制台的错误日志</li>
+        <li>
+          重点关注 <code>总耗时</code> 和 <code>无活动时间</code> 这两个指标
+        </li>
+        <li>
+          如果看到
+          <code>========== 下载错误详情 ==========</code>,说明捕获到了错误
+        </li>
+        <li>
+          记录下 <code>错误类型</code>、<code>错误消息</code> 和
+          <code>中断原因</code>
+        </li>
+      </ul>
+    </div>
+
+    <div class="test-section">
+      <h2>📊 日志分析要点</h2>
+      <h3>正常流程应该看到:</h3>
+      <ul>
+        <li><code>[Downloader xxxxxxxx] 创建下载任务</code></li>
+        <li><code>[Downloader xxxxxxxx] 开始下载流程</code></li>
+        <li><code>[Downloader xxxxxxxx] HEAD 请求完成</code></li>
+        <li><code>[Downloader xxxxxxxx] 文件信息</code></li>
+        <li><code>[Downloader xxxxxxxx] 分块 X 响应</code></li>
+        <li><code>[Downloader xxxxxxxx] 分块 X 进度</code> (每2秒)</li>
+        <li><code>[Downloader xxxxxxxx] 分块 X 完成</code></li>
+      </ul>
+
+      <h3>如果出现中断,会看到:</h3>
+      <ul>
+        <li><code>========== 下载错误详情 ==========</code></li>
+        <li>文件名、URL、错误类型、错误消息</li>
+        <li>总耗时、无活动时间</li>
+        <li>已下载字节数和百分比</li>
+        <li>中断原因</li>
+      </ul>
+    </div>
+
+    <div class="test-section">
+      <h2>🔍 常见问题诊断</h2>
+
+      <h3>场景1: 总耗时 ≈ 5秒,无活动时间 ≈ 5秒</h3>
+      <p><strong>可能原因:</strong> Service Worker 被系统回收,或网络连接超时</p>
+
+      <h3>场景2: HEAD 请求失败</h3>
+      <p><strong>可能原因:</strong> 服务器不支持 HEAD 请求,或有防盗链限制</p>
+
+      <h3>场景3: 错误消息包含 "Failed to fetch"</h3>
+      <p><strong>可能原因:</strong> 网络问题、CORS 限制、或服务器主动断开</p>
+
+      <h3>场景4: 错误消息包含 "请求超时"</h3>
+      <p><strong>可能原因:</strong> 网络延迟过高,超过了30秒的超时限制</p>
+    </div>
+
+    <div class="info">
+      <strong>💡 提示:</strong> 如果你在特定网站遇到下载中断问题,请:
+      <ol>
+        <li>复制完整的控制台日志</li>
+        <li>记录问题网站的 URL 和文件类型</li>
+        <li>查看诊断指南文档获取更多帮助</li>
+      </ol>
+    </div>
+  </body>
+</html>

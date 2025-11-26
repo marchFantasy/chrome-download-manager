@@ -350,16 +350,32 @@ class PopupManager {
     // 更新进度条
     const progressFill = item.querySelector('.progress-fill');
     if (progressFill) {
-      const percentage =
-        data.totalBytes > 0 ? (data.bytesReceived / data.totalBytes) * 100 : 0;
-      progressFill.style.width = `${percentage}%`;
+      if (data.totalBytes > 0) {
+        // 知道总大小,显示确定的进度
+        const percentage = (data.bytesReceived / data.totalBytes) * 100;
+        progressFill.style.width = `${percentage}%`;
+        progressFill.classList.remove('indeterminate');
+      } else if (data.state === 'in_progress') {
+        // 不知道总大小,显示不确定进度动画
+        // 使用已下载字节数的对数函数来估算一个视觉进度(不会超过80%)
+        const estimatedProgress = Math.min(
+          80,
+          Math.log10(data.bytesReceived + 1) * 10
+        );
+        progressFill.style.width = `${estimatedProgress}%`;
+        progressFill.classList.add('indeterminate');
+      }
     }
 
     // 更新大小和速度
     const metaSpan = item.querySelector('.download-meta span:first-child');
     if (metaSpan) {
       let text = this.formatSize(data.bytesReceived);
-      if (data.totalBytes) text += ` / ${this.formatSize(data.totalBytes)}`;
+      // 只有知道总大小时才显示 "已下载 / 总大小"
+      if (data.totalBytes > 0) {
+        text += ` / ${this.formatSize(data.totalBytes)}`;
+      }
+      // 显示速度
       if (data.state === 'in_progress' && data.speed) {
         text += ` • ${this.formatSpeed(data.speed)}`;
       }
@@ -393,9 +409,15 @@ class PopupManager {
             data.totalBytes > 0
               ? (data.bytesReceived / data.totalBytes) * 100
               : 0;
+          const indeterminateClass =
+            data.totalBytes > 0 ? '' : ' indeterminate';
+          const width =
+            data.totalBytes > 0
+              ? percentage + '%'
+              : Math.min(80, Math.log10(data.bytesReceived + 1) * 10) + '%';
           const progressHtml = `
             <div class="progress-bar">
-              <div class="progress-fill" style="width: ${percentage}%"></div>
+              <div class="progress-fill${indeterminateClass}" style="width: ${width}"></div>
             </div>
           `;
           item.insertAdjacentHTML('beforeend', progressHtml);
@@ -515,7 +537,14 @@ class PopupManager {
           download.state === 'in_progress'
             ? `
         <div class="progress-bar">
-          <div class="progress-fill" style="width: ${progress}%"></div>
+          <div class="progress-fill${
+            download.totalBytes > 0 ? '' : ' indeterminate'
+          }" style="width: ${
+                download.totalBytes > 0
+                  ? progress + '%'
+                  : Math.min(80, Math.log10(download.bytesReceived + 1) * 10) +
+                    '%'
+              }"></div>
         </div>
         `
             : ''
