@@ -585,6 +585,11 @@ class PopupManager {
       );
     }
 
+    // 添加复制链接按钮
+    buttons.push(
+      `<button class="btn btn-sm" data-action="copyLink" data-id="${download.id}" title="复制链接">🔗</button>`
+    );
+
     buttons.push(
       `<button class="btn btn-sm btn-danger" data-action="delete" data-id="${download.id}">🗑️</button>`
     );
@@ -642,6 +647,16 @@ class PopupManager {
         case 'resume':
           await this.sendMessage({ action: 'resumeDownload', downloadId });
           break;
+        case 'copyLink': {
+          const download = this.downloads.find((d) => d.id == downloadId);
+          if (download && download.url) {
+            await navigator.clipboard.writeText(download.url);
+            this.showNotification('链接已复制到剪贴板');
+          } else {
+            this.showNotification('无法获取下载链接', 'error');
+          }
+          break;
+        }
         case 'cancel': {
           const response = await this.sendMessage({
             action: 'cancelDownload',
