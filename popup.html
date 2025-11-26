@@ -1,109 +1,121 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title id="popupTitle">智能下载管理器</title>
-  <link rel="stylesheet" href="popup.css">
-</head>
-<body>
-  <div class="container">
-    <!-- 头部 -->
-    <header class="header">
-      <div class="header-top">
-        <h1>📥 智能下载管理器</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title id="popupTitle">智能下载管理器</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- 头部 -->
+      <header class="header">
+        <div class="header-top">
+          <h1>📥 智能下载管理器</h1>
+        </div>
+        <div class="header-actions">
+          <!-- 语言选择器 -->
+          <select
+            id="languageSelect"
+            class="language-select"
+            title="切换语言 / Change Language / 언어 전환 / 言語切り替え"
+          >
+            <option value="en">English</option>
+            <option value="zh_CN">简体中文</option>
+            <option value="ko">한국어</option>
+            <option value="ja">日本語</option>
+          </select>
+          <button id="settingsBtn" class="btn btn-sm">⚙️</button>
+          <button id="openManagerBtn" class="btn btn-sm" title="打开下载管理器">
+            🖥️
+          </button>
+        </div>
+      </header>
+
+      <!-- 批量操作栏 -->
+      <div class="batch-actions" id="batchActions" style="display: none;">
+        <span id="selectedCount" class="batch-info">已选择 0 项</span>
+        <div class="batch-buttons">
+          <button id="batchPauseBtn" class="btn btn-sm">⏸️</button>
+          <button id="batchResumeBtn" class="btn btn-sm">▶️</button>
+          <button id="batchCancelBtn" class="btn btn-sm">❌</button>
+          <button id="batchDeleteBtn" class="btn btn-sm btn-danger">🗑️</button>
+        </div>
       </div>
-      <div class="header-actions">
-        <!-- 语言选择器 -->
-        <select id="languageSelect" class="language-select" title="切换语言 / Change Language / 언어 전환 / 言語切り替え">
-          <option value="en">English</option>
-          <option value="zh_CN">简体中文</option>
-          <option value="ko">한국어</option>
-          <option value="ja">日本語</option>
+
+      <!-- 新增下载栏 -->
+      <div class="add-download-bar">
+        <input
+          type="text"
+          id="downloadUrlInput"
+          class="download-url-input"
+          placeholder="输入下载地址 (http/https/磁力链接等)"
+        />
+        <button id="addDownloadBtn" class="btn btn-primary">➕ 添加下载</button>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="filter-bar">
+        <select id="filterSelect" class="filter-select">
+          <option value="all">全部下载</option>
+          <option value="in_progress">进行中</option>
+          <option value="complete">已完成</option>
+          <option value="interrupted">已中断</option>
+          <option value="paused">已暂停</option>
         </select>
-        <button id="settingsBtn" class="btn btn-sm">⚙️</button>
+        <div class="filter-buttons">
+          <button id="selectAllBtn" class="btn btn-sm">全选</button>
+          <button id="clearSelectionBtn" class="btn btn-sm">清除选择</button>
+        </div>
       </div>
-    </header>
 
-    <!-- 批量操作栏 -->
-    <div class="batch-actions" id="batchActions" style="display: none;">
-      <span id="selectedCount" class="batch-info">已选择 0 项</span>
-      <div class="batch-buttons">
-        <button id="batchPauseBtn" class="btn btn-sm">⏸️</button>
-        <button id="batchResumeBtn" class="btn btn-sm">▶️</button>
-        <button id="batchCancelBtn" class="btn btn-sm">❌</button>
-        <button id="batchDeleteBtn" class="btn btn-sm btn-danger">🗑️</button>
+      <!-- 下载列表 -->
+      <div class="downloads-list" id="downloadsList">
+        <div class="empty-state">
+          <div class="empty-icon">📥</div>
+          <p>暂无下载记录</p>
+          <small>开始下载文件时会显示在这里</small>
+        </div>
+      </div>
+
+      <!-- 底部操作栏 -->
+      <footer class="footer">
+        <div class="footer-actions">
+          <button id="clearCompletedBtn" class="btn btn-sm">清除已完成</button>
+          <button id="exportBtn" class="btn btn-sm">📤 导出</button>
+          <button id="importBtn" class="btn btn-sm">📥 导入</button>
+        </div>
+        <div class="footer-info">
+          <span id="lastUpdate">最后更新: --</span>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">提示</h3>
+          <button id="closeModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p id="modalMessage">确认要执行此操作吗？</p>
+        </div>
+        <div class="modal-footer">
+          <button id="modalCancel" class="btn">取消</button>
+          <button id="modalConfirm" class="btn btn-primary">确认</button>
+        </div>
       </div>
     </div>
 
-    <!-- 新增下载栏 -->
-    <div class="add-download-bar">
-      <input type="text" id="downloadUrlInput" class="download-url-input" placeholder="输入下载地址 (http/https/磁力链接等)">
-      <button id="addDownloadBtn" class="btn btn-primary">➕ 添加下载</button>
-    </div>
-
-    <!-- 筛选栏 -->
-    <div class="filter-bar">
-      <select id="filterSelect" class="filter-select">
-        <option value="all">全部下载</option>
-        <option value="in_progress">进行中</option>
-        <option value="complete">已完成</option>
-        <option value="interrupted">已中断</option>
-        <option value="paused">已暂停</option>
-      </select>
-      <div class="filter-buttons">
-        <button id="selectAllBtn" class="btn btn-sm">全选</button>
-        <button id="clearSelectionBtn" class="btn btn-sm">清除选择</button>
+    <!-- 通知 -->
+    <div id="notification" class="notification" style="display: none;">
+      <div class="notification-content">
+        <span id="notificationMessage"></span>
+        <button id="closeNotification" class="notification-close">×</button>
       </div>
     </div>
 
-    <!-- 下载列表 -->
-    <div class="downloads-list" id="downloadsList">
-      <div class="empty-state">
-        <div class="empty-icon">📥</div>
-        <p>暂无下载记录</p>
-        <small>开始下载文件时会显示在这里</small>
-      </div>
-    </div>
-
-    <!-- 底部操作栏 -->
-    <footer class="footer">
-      <div class="footer-actions">
-        <button id="clearCompletedBtn" class="btn btn-sm">清除已完成</button>
-        <button id="exportBtn" class="btn btn-sm">📤 导出</button>
-        <button id="importBtn" class="btn btn-sm">📥 导入</button>
-      </div>
-      <div class="footer-info">
-        <span id="lastUpdate">最后更新: --</span>
-      </div>
-    </footer>
-  </div>
-
-  <!-- 模态框 -->
-  <div id="modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modalTitle">提示</h3>
-        <button id="closeModal" class="modal-close">×</button>
-      </div>
-      <div class="modal-body">
-        <p id="modalMessage">确认要执行此操作吗？</p>
-      </div>
-      <div class="modal-footer">
-        <button id="modalCancel" class="btn">取消</button>
-        <button id="modalConfirm" class="btn btn-primary">确认</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 通知 -->
-  <div id="notification" class="notification" style="display: none;">
-    <div class="notification-content">
-      <span id="notificationMessage"></span>
-      <button id="closeNotification" class="notification-close">×</button>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
-</body>
+    <script src="popup.js"></script>
+  </body>
 </html>

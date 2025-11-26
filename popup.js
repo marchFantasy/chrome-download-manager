@@ -237,6 +237,14 @@ class PopupManager {
       .getElementById('settingsBtn')
       .addEventListener('click', () => this.openSettings());
 
+    // 打开下载管理器页面
+    const openManagerBtn = document.getElementById('openManagerBtn');
+    if (openManagerBtn) {
+      openManagerBtn.addEventListener('click', () => {
+        chrome.tabs.create({ url: 'manager.html' });
+      });
+    }
+
     // 新增下载
     document
       .getElementById('addDownloadBtn')
@@ -317,28 +325,22 @@ class PopupManager {
     try {
       const response = await this.sendMessage({ action: 'getDownloads' });
 
-      if (response && response.downloads) {
-        // 只有当列表长度变化或状态发生重大变化时才全量重新渲染
-        // 简单的 diff 检查
-        if (
-          JSON.stringify(this.downloads.map((d) => d.id)) !==
-          JSON.stringify(response.downloads.map((d) => d.id))
-        ) {
-          this.downloads = response.downloads;
-          this.isLoading = false; // 数据加载完成
-          this.renderDownloads();
-        } else {
-          // 仅更新数据，不重绘 DOM（由 updateDownloadItem 处理）
-          this.downloads = response.downloads;
-          this.isLoading = false;
-          // 强制更新一次状态文本
-          this.downloads.forEach((d) => this.updateDownloadItem(d));
-        }
-        this.updateStats();
+      // 不管返回什么，都先用返回的数据更新 this.downloads
+      this.downloads = response && response.downloads ? response.downloads : [];
+
+      // 如果下载列表不为空，检查文件是否存在
+      if (this.downloads.length > 0) {
+        await this.checkFilesExistence();
       }
     } catch (error) {
       console.error('加载下载列表失败:', error);
-      this.isLoading = false;
+      // 即使失败，也清空列表以防显示旧数据
+      this.downloads = [];
+    } finally {
+      // 无论成功还是失败，最后都执行UI更新
+      this.isLoading = false; // 结束加载状态
+      this.renderDownloads(); // 渲染UI
+      this.updateStats(); // 更新统计信息
     }
   }
 
@@ -485,54 +487,56 @@ class PopupManager {
 
   // 创建下载项目
   createDownloadItem(download) {
-    const isSelected = this.selectedDownloads.has(download.id);
     const progress =
       download.totalBytes > 0
         ? Math.round((download.bytesReceived / download.totalBytes) * 100)
         : 0;
 
-    const statusIcon = this.getStatusIcon(download);
-    const statusText = this.getStatusText(download);
+    let statusText = this.getStatusText(download);
+    const size = this.formatSize(download.totalBytes);
+    const received = this.formatSize(download.bytesReceived);
 
-    let sizeText =
-      this.formatSize(download.bytesReceived) +
-      (download.totalBytes ? ` / ${this.formatSize(download.totalBytes)}` : '');
+    let statusClass = `status-${download.state}`;
 
-    if (download.state === 'in_progress' && download.speed) {
-      sizeText += ` • ${this.formatSpeed(download.speed)}`;
+    // 如果是完成状态但文件不存在
+    if (download.state === 'complete' && download.exists === false) {
+      statusClass = 'status-not-exists';
+      // statusText 由 getStatusText 统一处理
     }
 
     return `
-      <div class="download-item ${isSelected ? 'selected' : ''}" data-id="${
-      download.id
-    }" data-status="${download.state}">
+      <div class="download-item ${
+        this.selectedDownloads.has(download.id) ? 'selected' : ''
+      }" data-id="${download.id}" data-status="${download.state}">
         <div class="download-header">
           <div class="download-info">
             <div class="download-filename" title="${this.escapeHtml(
               download.filename
             )}">${this.escapeHtml(download.filename)}</div>
             <div class="download-meta">
-              <span>${sizeText}</span>
+              <span>${received} / ${size}</span>
               <span>${this.formatTime(download.startTime)}</span>
             </div>
           </div>
           <div class="download-actions">
-            <input type="checkbox" class="download-checkbox" ${
-              isSelected ? 'checked' : ''
-            } data-id="${download.id}">
+            <input type="checkbox" class="download-checkbox" data-id="${
+              download.id
+            }" ${this.selectedDownloads.has(download.id) ? 'checked' : ''}>
           </div>
         </div>
+        
         <div class="download-status">
           <div class="status-left">
-            <div class="status-icon ${statusIcon}">${this.getStatusEmoji(
-      download
-    )}</div>
+            <div class="status-icon ${this.getStatusIcon(
+              download
+            )}">${this.getStatusEmoji(download)}</div>
             <span class="status-text">${statusText}</span>
           </div>
           <div class="status-actions">
             ${this.createActionButtons(download)}
           </div>
         </div>
+        
         ${
           download.state === 'in_progress'
             ? `
@@ -578,8 +582,8 @@ class PopupManager {
       );
     }
 
-    // 添加打开文件夹按钮（仅对已完成的下载显示）
-    if (download.state === 'complete') {
+    // 添加打开文件夹按钮（仅对已完成且存在的下载显示）
+    if (download.state === 'complete' && download.exists !== false) {
       buttons.push(
         `<button class="btn btn-sm" data-action="openFolder" data-id="${download.id}">📁</button>`
       );
@@ -930,12 +934,46 @@ class PopupManager {
   }
 
   // 检查所有文件存在性
-  async checkAllFiles() {
-    // 暂不实现
+  async checkFilesExistence() {
+    const downloadIds = this.downloads
+      .map((d) => d.finalDownloadId)
+      .filter((id) => id !== undefined && id !== null);
+
+    if (downloadIds.length === 0) return;
+
+    try {
+      // 找到最早的开始时间，用于过滤查询
+      // 减去 24 小时以防时间偏差
+      const minTime = Math.min(
+        ...this.downloads.map((d) => d.startTime || Date.now())
+      );
+      const searchTime = new Date(minTime - 24 * 60 * 60 * 1000).toISOString();
+
+      // 查询该时间之后的所有下载
+      const chromeDownloads = await new Promise((resolve) => {
+        chrome.downloads.search({ startedAfter: searchTime }, resolve);
+      });
+
+      const chromeMap = new Map(chromeDownloads.map((cd) => [cd.id, cd]));
+
+      this.downloads.forEach((d) => {
+        if (d.finalDownloadId) {
+          const cd = chromeMap.get(d.finalDownloadId);
+          // 如果记录存在且 exists 为 true，则文件存在
+          // 如果记录不存在（被清除历史）或者 exists 为 false，则文件不存在
+          d.exists = cd ? cd.exists : false;
+        } else {
+          // 没有 finalDownloadId 的（如下载失败的），默认 false
+          d.exists = false;
+        }
+      });
+    } catch (error) {
+      console.error('检查文件存在性失败:', error);
+    }
   }
 
   // 检查单个文件存在性
-  async checkSingleFile(downloadId) {
+  async checkSingleFile() {
     // 暂不实现
   }
 
@@ -945,7 +983,7 @@ class PopupManager {
     input.type = 'file';
     input.accept = '.json';
 
-    input.onchange = (e) => {
+    input.onchange = () => {
       this.showNotification('导入功能开发中...');
     };
 
@@ -990,7 +1028,7 @@ class PopupManager {
     // 所以我们这里调用 chrome.downloads.download，它会触发 onCreated，然后被 background 拦截。
 
     try {
-      chrome.downloads.download({ url: url }, (id) => {
+      chrome.downloads.download({ url: url }, () => {
         if (chrome.runtime.lastError) {
           this.showNotification(
             '创建下载失败: ' + chrome.runtime.lastError.message,
@@ -1102,6 +1140,9 @@ class PopupManager {
 
   // 获取状态图标
   getStatusIcon(download) {
+    if (download.state === 'complete' && download.exists === false) {
+      return 'status-not-exists'; // 文件不存在时的状态类
+    }
     switch (download.state) {
       case 'in_progress':
         return 'status-active';
@@ -1118,6 +1159,9 @@ class PopupManager {
 
   // 获取状态文本
   getStatusText(download) {
+    if (download.state === 'complete' && download.exists === false) {
+      return this._('fileNotExists'); // 使用国际化文本
+    }
     switch (download.state) {
       case 'in_progress':
         return this._('inProgress');
@@ -1134,6 +1178,9 @@ class PopupManager {
 
   // 获取状态Emoji
   getStatusEmoji(download) {
+    if (download.state === 'complete' && download.exists === false) {
+      return '⚠️'; // 文件不存在时显示警告图标
+    }
     switch (download.state) {
       case 'in_progress':
         return '⬇️';
