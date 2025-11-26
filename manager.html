@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>下载管理器 - Chrome Download Manager</title>
+    <link rel="stylesheet" href="manager.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- 侧边栏 -->
+      <aside class="sidebar">
+        <div class="logo">
+          <h2>📥 下载管理</h2>
+        </div>
+
+        <nav class="nav-menu">
+          <div class="nav-item active" data-filter="all">
+            <span class="icon">📋</span>
+            <span class="label">全部下载</span>
+            <span class="count" id="count-all">0</span>
+          </div>
+          <div class="nav-item" data-filter="in_progress">
+            <span class="icon">⬇️</span>
+            <span class="label">下载中</span>
+            <span class="count" id="count-in_progress">0</span>
+          </div>
+          <div class="nav-item" data-filter="complete">
+            <span class="icon">✅</span>
+            <span class="label">已完成</span>
+            <span class="count" id="count-complete">0</span>
+          </div>
+          <div class="nav-item" data-filter="interrupted">
+            <span class="icon">⚠️</span>
+            <span class="label">已中断</span>
+            <span class="count" id="count-interrupted">0</span>
+          </div>
+        </nav>
+
+        <div class="file-types-menu">
+          <h3>文件类型</h3>
+          <div class="nav-item" data-type="image">
+            <span class="icon">🖼️</span>
+            <span class="label">图片</span>
+          </div>
+          <div class="nav-item" data-type="video">
+            <span class="icon">🎬</span>
+            <span class="label">视频</span>
+          </div>
+          <div class="nav-item" data-type="audio">
+            <span class="icon">🎵</span>
+            <span class="label">音频</span>
+          </div>
+          <div class="nav-item" data-type="document">
+            <span class="icon">📄</span>
+            <span class="label">文档</span>
+          </div>
+          <div class="nav-item" data-type="archive">
+            <span class="icon">📦</span>
+            <span class="label">压缩包</span>
+          </div>
+          <div class="nav-item" data-type="other">
+            <span class="icon">❓</span>
+            <span class="label">其他</span>
+          </div>
+        </div>
+
+        <div class="storage-info">
+          <span class="storage-text"
+            >总下载数: <span id="total-downloads-count">0</span></span
+          >
+        </div>
+      </aside>
+
+      <!-- 主内容区 -->
+      <main class="main-content">
+        <header class="top-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="搜索文件名或链接..."
+            />
+          </div>
+          <div class="actions">
+            <button id="clearCompletedBtn" class="btn btn-outline">
+              清除已完成
+            </button>
+            <button id="newDownloadBtn" class="btn btn-primary">
+              ➕ 新建下载
+            </button>
+          </div>
+        </header>
+
+        <div class="content-area">
+          <div class="list-header">
+            <div class="col-name">文件名</div>
+            <div class="col-status">状态</div>
+            <div class="col-size">大小</div>
+            <div class="col-speed">速度</div>
+            <div class="col-time">时间</div>
+            <div class="col-actions">操作</div>
+          </div>
+          <div id="downloadList" class="download-list">
+            <!-- 下载项将在这里动态生成 -->
+            <div class="empty-state">
+              <div class="empty-icon">⏳</div>
+              <p>加载中...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 新建下载模态框 -->
+    <div id="newDownloadModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>新建下载任务</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="urlInput">下载链接</label>
+            <input
+              type="text"
+              id="urlInput"
+              placeholder="请输入下载链接 (http:// 或 https://)"
+            />
+          </div>
+          <div class="form-group">
+            <label for="filenameInput">文件名 (可选)</label>
+            <input type="text" id="filenameInput" placeholder="自定义文件名" />
+          </div>
+          <div class="form-group">
+            <label for="threadsInput">线程数</label>
+            <select id="threadsInput">
+              <option value="1">单线程</option>
+              <option value="2">2 线程</option>
+              <option value="4" selected>4 线程</option>
+              <option value="8">8 线程</option>
+              <option value="16">16 线程</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline close-btn">取消</button>
+          <button id="startDownloadBtn" class="btn btn-primary">
+            开始下载
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div id="notificationContainer"></div>
+
+    <script src="manager.js"></script>
+  </body>
+</html>
