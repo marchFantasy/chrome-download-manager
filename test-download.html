@@ -97,7 +97,21 @@
     </div>
 
     <div class="test-section">
-      <h2>测试3: 不支持 Range 的服务器</h2>
+      <h2>测试3: JSON 文件下载</h2>
+      <p>测试 JSON 文件是否能被正确监听和下载</p>
+      <a
+        href="https://jsonplaceholder.typicode.com/users"
+        class="download-link"
+        download="users.json"
+        >下载 JSON 文件 (API)</a
+      >
+      <button class="download-link" onclick="downloadGeneratedJSON()">
+        下载生成的 JSON 文件
+      </button>
+    </div>
+
+    <div class="test-section">
+      <h2>测试4: 不支持 Range 的服务器</h2>
       <p>测试单线程下载模式的日志输出</p>
       <a href="https://httpbin.org/image/png" class="download-link" download
         >下载图片 (httpbin)</a
@@ -169,5 +183,32 @@
         <li>查看诊断指南文档获取更多帮助</li>
       </ol>
     </div>
+
+    <script>
+      // 生成并下载 JSON 文件
+      function downloadGeneratedJSON() {
+        const data = {
+          name: "测试数据",
+          timestamp: new Date().toISOString(),
+          items: [
+            { id: 1, value: "Item 1" },
+            { id: 2, value: "Item 2" },
+            { id: 3, value: "Item 3" }
+          ]
+        };
+
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'generated-data.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    </script>
   </body>
 </html>

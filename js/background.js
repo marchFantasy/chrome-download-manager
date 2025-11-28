@@ -41,6 +41,15 @@ chrome.downloads.onErased.addListener((downloadId) => {
   }
 });
 
+// 监听文件名确定事件（用于获取 Blob URL 的真实文件名）
+chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
+  if (downloadManager) {
+    // 返回 true 表示异步处理
+    return downloadManager.handleDeterminingFilename(downloadItem, suggest);
+  }
+  return false;
+});
+
 console.log('下载事件监听器已在顶层注册 (Service Worker 唤醒时立即可用)');
 
 // ============================================================================
@@ -55,6 +64,9 @@ class DownloadManager {
     this.fileCheckTimer = null; // 文件检查定时器
     this.internalDownloadIds = new Set(); // 追踪由本扩展发起的下载ID（用于最终保存文件）
     this.largeFileUrls = new Set(); // 追踪大文件的 URL，避免重复拦截
+    this.internalBlobUrls = new Set(); // 追踪扩展自己生成的 Blob/Data URL，避免拦截内部保存任务
+    this.pendingBlobDownloads = new Set(); // 追踪等待文件名确定的 Blob 下载
+    this.tempDownloads = new Set(); // 追踪需要清理的临时 Blob 下载
     this.isReady = false; // 标记初始化是否完成
     this.isFirstRun = false; // 标记是否是首次运行（区分首次启动和 Service Worker 唤醒）
     this.initStartTime = Date.now(); // 记录初始化开始时间
@@ -430,6 +442,9 @@ class DownloadManager {
         reader.onload = () => {
           const dataUrl = reader.result;
 
+          // 标记这是扩展自己生成的下载,避免被拦截
+          this.internalBlobUrls.add(dataUrl);
+
           chrome.downloads.download(
             {
               url: dataUrl,
@@ -437,6 +452,9 @@ class DownloadManager {
               saveAs: false,
             },
             (downloadId) => {
+              // 用完即删,防止内存泄漏
+              this.internalBlobUrls.delete(dataUrl);
+
               if (chrome.runtime.lastError) {
                 console.error('保存文件失败:', chrome.runtime.lastError);
                 downloadInfo.error = chrome.runtime.lastError.message;
@@ -528,19 +546,7 @@ class DownloadManager {
       return;
     }
 
-    // 2. 检查是否是 Blob URL 或 Data URL (我们自己生成的)
-    if (
-      downloadItem.url.startsWith('blob:') ||
-      downloadItem.url.startsWith('data:')
-    ) {
-      console.log(
-        '检测到 Blob/Data URL，放行:',
-        downloadItem.url.substring(0, 50) + '...'
-      );
-      return;
-    }
-
-    // 3. 检查是否是大文件重新下载（避免重复拦截）
+    // 2. 检查是否是大文件重新下载（避免重复拦截）
     if (this.largeFileUrls.has(downloadItem.url)) {
       console.log('检测到大文件重新下载任务，放行:', downloadItem.url);
       // 下载开始后可以从 Set 中移除
@@ -548,8 +554,55 @@ class DownloadManager {
       return;
     }
 
-    // 4. 拦截普通下载
+    // 3. Blob/Data URL 检查
+    if (
+      downloadItem.url.startsWith('blob:') ||
+      downloadItem.url.startsWith('data:')
+    ) {
+      // 检查是否是扩展内部生成的（白名单）
+      if (this.internalBlobUrls.has(downloadItem.url)) {
+        console.log(
+          '检测到扩展内部保存任务，放行:',
+          downloadItem.url.substring(0, 50) + '...'
+        );
+        this.internalBlobUrls.delete(downloadItem.url);
+        return;
+      }
+
+      // 对于外部 Blob URL，推迟拦截，等待 onDeterminingFilename 获取真实文件名
+      console.log(
+        '检测到外部 Blob/Data URL，推迟拦截以获取文件名:',
+        downloadItem.url
+      );
+      this.pendingBlobDownloads.add(downloadItem.id);
+      return;
+    }
+
+    // ============================================================
+    // 4. 拦截普通下载 (HTTP/HTTPS)
+    // ============================================================
     console.log('拦截到外部下载，准备接管:', downloadItem.url);
+    console.log('downloadItem 详细信息:', {
+      id: downloadItem.id,
+      url: downloadItem.url,
+      filename: downloadItem.filename,
+      mime: downloadItem.mime,
+      fileSize: downloadItem.fileSize,
+    });
+
+    // 提取文件名
+    // 对于 HTTP/HTTPS URL，使用现有的提取逻辑
+    const filename =
+      this.extractBaseFilename(downloadItem.filename) ||
+      this.extractFilename(downloadItem.url);
+
+    console.log('========== 拦截下载详情 ==========');
+    console.log(`时间: ${new Date().toISOString()}`);
+    console.log(`文件名: ${filename}`);
+    console.log(`URL: ${downloadItem.url}`);
+    console.log(`原始下载ID: ${downloadItem.id}`);
+    console.log(`MIME类型: ${downloadItem.mime || '未知'}`);
+    console.log('====================================');
 
     // 取消原生下载
     chrome.downloads.cancel(downloadItem.id, () => {
@@ -563,18 +616,6 @@ class DownloadManager {
     });
 
     // 启动内部下载
-    const filename =
-      this.extractBaseFilename(downloadItem.filename) ||
-      this.extractFilename(downloadItem.url);
-
-    console.log('========== 拦截下载详情 ==========');
-    console.log(`时间: ${new Date().toISOString()}`);
-    console.log(`文件名: ${filename}`);
-    console.log(`URL: ${downloadItem.url}`);
-    console.log(`原始下载ID: ${downloadItem.id}`);
-    console.log(`MIME类型: ${downloadItem.mime || '未知'}`);
-    console.log('====================================');
-
     this.startInternalDownload(downloadItem.url, filename);
   }
 
@@ -605,11 +646,101 @@ class DownloadManager {
         }
       }
     }
+
+    // 检查是否是临时 Blob 下载（重命名策略）
+    if (this.tempDownloads.has(downloadDelta.id)) {
+      if (downloadDelta.state && downloadDelta.state.current === 'complete') {
+        console.log('临时 Blob 下载完成，清理文件:', downloadDelta.id);
+        // 删除文件
+        chrome.downloads.removeFile(downloadDelta.id, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('清理临时文件失败:', chrome.runtime.lastError);
+          }
+          // 删除记录
+          chrome.downloads.erase({ id: downloadDelta.id });
+        });
+        this.tempDownloads.delete(downloadDelta.id);
+      }
+    }
   }
 
   // 下载删除事件
   onDownloadErased(downloadId) {
     // 忽略
+  }
+
+  // 处理文件名确定事件
+  handleDeterminingFilename(downloadItem, suggest) {
+    // 检查是否是等待处理的 Blob 下载
+    if (this.pendingBlobDownloads.has(downloadItem.id)) {
+      console.log(
+        'onDeterminingFilename 捕获到等待的 Blob 下载:',
+        downloadItem.id
+      );
+      console.log('建议文件名:', downloadItem.filename);
+
+      this.pendingBlobDownloads.delete(downloadItem.id);
+
+      // 1. 获取文件名
+      let filename = downloadItem.filename;
+
+      // 如果文件名为空，尝试使用 MIME 类型推断（作为后备）
+      if (!filename) {
+        const timestamp = Date.now();
+        const mimeToExt = {
+          'application/json': 'json',
+          'application/x-yaml': 'yaml',
+          'text/yaml': 'yaml',
+          'application/yaml': 'yaml',
+          'text/csv': 'csv',
+          'text/plain': 'txt',
+          'application/xml': 'xml',
+          'text/xml': 'xml',
+          'application/pdf': 'pdf',
+          'image/png': 'png',
+          'image/jpeg': 'jpg',
+          'image/gif': 'gif',
+          'image/svg+xml': 'svg',
+        };
+        const ext = mimeToExt[downloadItem.mime] || 'bin';
+        filename = `download_${timestamp}.${ext}`;
+        console.log(`仍无文件名，使用 MIME 推断: ${filename}`);
+      } else {
+        // 提取基础文件名（去掉路径）
+        const normalizedPath = filename.replace(/\\/g, '/');
+        filename = normalizedPath.substring(
+          normalizedPath.lastIndexOf('/') + 1
+        );
+      }
+
+      // 2. 启动内部下载 (使用真实文件名)
+      console.log('使用获取到的文件名启动内部下载:', filename);
+      this.startInternalDownload(downloadItem.url, filename);
+
+      // 3. 处理原生下载：重命名为临时文件，稍后删除
+      // 避免直接 cancel 导致 "Download must be in progress" 报错
+      // 同时也避免文件名冲突（原生下载占用真实文件名）
+      const tempFilename = `chrome_download_manager_tmp/${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}.tmp`;
+      console.log('原生 Blob 下载重命名为临时文件:', tempFilename);
+
+      this.tempDownloads.add(downloadItem.id);
+
+      // 4. 建议使用临时文件名
+      // 注意：这里不需要调用 cancel，也不需要 pause，直接 suggest 即可
+      // 浏览器会等待 suggest 被调用
+      try {
+        suggest({ filename: tempFilename, conflictAction: 'overwrite' });
+        console.log('已建议临时文件名，原生下载将继续但稍后被清理');
+      } catch (e) {
+        console.error('调用 suggest 失败:', e);
+      }
+      return true;
+    }
+
+    // 对于其他下载，不干预
+    return false;
   }
 
   // 提取文件名（从完整路径中获取纯文件名+扩展名）
